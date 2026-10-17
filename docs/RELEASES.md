@@ -15,3 +15,9 @@ São 5 releases. Cada uma tem uma branch própria, quantos commits forem necess�
 - Servidor: Node 22, Socket.IO, Zod para validar mensagens.
 - Cliente: Vite + React, configuração por variáveis de ambiente (`VITE_*`).
 - Testes: Vitest (unitários); Playwright (ponta a ponta).
+
+## Teste jogável (v0.3, v0.4, v0.5)
+Ao fim de cada release com interface, o orquestrador joga uma partida completa no Chromium (Playwright) em tela de celular (390×844) e em desktop. Depois:
+1. dá uma nota de 0 a 10 para UX/UI, com justificativa;
+2. envia as capturas de tela para o dono do jogo;
+3. corrige o que for necessário e joga de novo para confirmar.
