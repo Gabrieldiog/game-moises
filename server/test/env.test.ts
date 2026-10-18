@@ -25,6 +25,7 @@ describe('loadServerConfig', () => {
       CORS_ORIGIN: 'https://moises.example, https://www.moises.example',
       TRUST_PROXY_HOPS: '1',
       LOG_LEVEL: 'warn',
+      STATIC_DIR: ' ../client/dist ',
       MAX_MESSAGE_BYTES: '4096',
       MAX_CONNECTIONS: '100',
       MAX_CONNECTIONS_PER_IP: '3',
@@ -50,6 +51,7 @@ describe('loadServerConfig', () => {
       corsOrigins: ['https://moises.example', 'https://www.moises.example'],
       trustProxyHops: 1,
       logLevel: 'warn',
+      staticDir: '../client/dist',
       limits: {
         maxMessageBytes: 4096,
         maxConnections: 100,

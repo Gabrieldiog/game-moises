@@ -18,6 +18,8 @@ curl http://localhost:3000/health
 
 Configuração por variáveis de ambiente, validadas ao iniciar: veja `server/.env.example` (copie para `server/.env`). Em produção, `NODE_ENV=production` e `CORS_ORIGIN` são obrigatórios. Para implantar: gere o build com `npm ci && npm run build` (precisa das dependências de desenvolvimento); no ambiente final, `npm ci --omit=dev` e `node --enable-source-maps server/dist/main.js`. O build já inclui o pacote `shared`; socket.io e zod vêm de `node_modules`.
 
+Implantação (VM, Docker, Caddy): `docs/DEPLOY.md`. Com `STATIC_DIR=client/dist` o servidor também serve o cliente (uma porta só).
+
 Documentos: regras em `docs/REGRAS.md`, protocolo cliente ↔ servidor em `docs/PROTOCOLO.md`, plano em `docs/RELEASES.md`.
 
 ### Cliente web

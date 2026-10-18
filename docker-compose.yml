@@ -1,0 +1,24 @@
+# Uso: copie .env.example para .env, ajuste e rode `docker compose up -d --build`.
+services:
+  moises:
+    build:
+      context: .
+      args:
+        # Endereço público do jogo (https://seu-dominio). Embutido no JS do cliente; não é segredo.
+        VITE_SERVER_URL: ${VITE_SERVER_URL:?defina VITE_SERVER_URL no .env}
+    image: moises:latest
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      CORS_ORIGIN: ${CORS_ORIGIN:?defina CORS_ORIGIN no .env}
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    # Só localhost: quem recebe a internet é o Caddy (HTTPS). Sem Caddy, troque por "3000:3000".
+    ports:
+      - "127.0.0.1:${PORT:-3000}:3000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m

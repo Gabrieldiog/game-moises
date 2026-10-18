@@ -14,7 +14,13 @@ try {
 }
 
 const logger = createLogger(config.server.logLevel);
-const server = createGameServer({ config: config.server, rules: config.rules, logger });
+let server: ReturnType<typeof createGameServer>;
+try {
+  server = createGameServer({ config: config.server, rules: config.rules, logger });
+} catch (error) {
+  process.stderr.write(`${(error as Error).message}\n`);
+  process.exit(1);
+}
 
 process.on('unhandledRejection', (reason) => logger.error('unhandled rejection', { error: reason }));
 

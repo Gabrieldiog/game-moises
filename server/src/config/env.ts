@@ -39,6 +39,8 @@ export interface ServerConfig {
   /** Reverse proxies in front of the server whose X-Forwarded-For can be trusted (0 = none). */
   readonly trustProxyHops: number;
   readonly logLevel: LogLevel;
+  /** Folder with the built client (client/dist) to serve from this same origin, or null to serve only /health and Socket.IO. */
+  readonly staticDir: string | null;
   readonly limits: {
     /** Largest Socket.IO message accepted (bytes). */
     readonly maxMessageBytes: number;
@@ -76,6 +78,7 @@ export const SERVER_ENV_VARS = [
   'CORS_ORIGIN',
   'TRUST_PROXY_HOPS',
   'LOG_LEVEL',
+  'STATIC_DIR',
   'MAX_MESSAGE_BYTES',
   'MAX_CONNECTIONS',
   'MAX_CONNECTIONS_PER_IP',
@@ -164,6 +167,11 @@ const EnvSchema = z
     CORS_ORIGIN: CorsSchema,
     TRUST_PROXY_HOPS: wholeNumber(0, 0, 10),
     LOG_LEVEL: optionalEnum(LOG_LEVELS, 'info'),
+    STATIC_DIR: z
+      .string()
+      .optional()
+      .transform((raw) => (raw === undefined || raw.trim() === '' ? null : raw.trim()))
+      .pipe(z.string().max(1024).refine((value) => !value.includes('\0'), 'must be a path').nullable()),
     MAX_MESSAGE_BYTES: wholeNumber(16_384, 1_024, 1_048_576),
     MAX_CONNECTIONS: wholeNumber(2_000, 1, 1_000_000),
     MAX_CONNECTIONS_PER_IP: wholeNumber(20, 1, 10_000),
@@ -211,6 +219,7 @@ export function loadServerConfig(env: Env = process.env): ServerConfig {
     corsOrigins: e.CORS_ORIGIN ?? [...DEV_CORS_ORIGINS],
     trustProxyHops: e.TRUST_PROXY_HOPS,
     logLevel: e.LOG_LEVEL,
+    staticDir: e.STATIC_DIR,
     limits: {
       maxMessageBytes: e.MAX_MESSAGE_BYTES,
       maxConnections: e.MAX_CONNECTIONS,
