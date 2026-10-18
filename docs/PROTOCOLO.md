@@ -169,8 +169,13 @@ Nunca contém cartas nem tokens. Em `ended` a sala funciona como lobby: o anfitr
 | Salas | 500 no total, 5 criadas por IP | `MAX_ROOMS`, `MAX_ROOMS_PER_IP` |
 | Sala sem atividade humana | 30 min | `ROOM_IDLE_TTL_MS` |
 | Sala sem humano conectado | 2 min | `ROOM_EMPTY_TTL_MS` |
+| Códigos de sala errados | 20 por IP a cada 5 min | `JOIN_FAIL_MAX`, `JOIN_FAIL_WINDOW_MS` |
 
 Uma mensagem acima da taxa recebe `RATE_LIMITED` e é descartada. Atrás de proxy reverso, configure `TRUST_PROXY_HOPS` para os limites por IP usarem o endereço real (`X-Forwarded-For`).
+
+- Depois de `JOIN_FAIL_MAX` códigos inexistentes, todo `room:join` daquele IP responde `RATE_LIMITED` (mesmo com o código certo) até a janela acabar. O cliente deve mostrar "muitas tentativas, espere alguns minutos".
+- Endereços IPv6 são agrupados por prefixo /64 em todos os limites por IP.
+- Acima de 2× `MAX_CONNECTIONS_PER_IP` conexões que ainda não terminaram o handshake, novas conexões daquele IP são fechadas sem `connect_error` próprio.
 
 ## Códigos de erro do protocolo
 
