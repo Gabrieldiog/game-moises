@@ -9,6 +9,7 @@ import type {
   SlotRef,
   SlotView,
   Suit,
+  TableSettingsView,
   TurnView,
 } from '@moises/shared';
 
@@ -22,9 +23,17 @@ export const DEMO_SERVER = {
   players: { min: 2, max: 6 },
   deckSize: 54,
   gridSize: 4,
-  timings: { arrangeMs: 5_000, initialPeekMs: 5_000, reactionWindowMs: 3_000, revealMs: 3_000, turnMs: 30_000 },
+  timings: { arrangeMs: 5_000, initialPeekMs: 5_000, reactionWindowMs: 3_000, revealMs: 3_000, turnMs: 15_000 },
   /** Cards the black K shows (the server sends it as TurnView.powerTargetCount). */
   powers: { peekManyCount: 2 },
+  /** Reaction attempts per player per window (ReactionWindowView.attemptsPerPlayer). */
+  reactionAttempts: 2,
+  /** Default "Configurações da mesa" of a new room (RoomView.table): everything on. */
+  table: {
+    turnSeconds: 15,
+    reactions: { matchOwn: true, matchOpponent: true },
+    powers: ['7', '8', '9', '10', 'J', 'Q', 'K'],
+  } satisfies TableSettingsView,
 } as const;
 
 /** Arbitrary fixed server clock for fixtures (the client derives its offset from `now`). */
@@ -245,6 +254,8 @@ const SCENES: Record<ScenarioId, (ctx: Ctx) => GameView> = {
         openedBy: discarder,
         deadline: ctx.now + ctx.ms('reactionWindowMs'),
         attemptedBy: wrong ? [wrong] : [],
+        attemptsPerPlayer: DEMO_SERVER.reactionAttempts,
+        yourAttemptsLeft: DEMO_SERVER.reactionAttempts,
       },
     };
   },

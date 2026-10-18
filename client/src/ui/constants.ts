@@ -17,3 +17,6 @@ export const REQUEST_TIMEOUT_MS = 8_000;
  * server refuses anything else with ROOM_FULL.
  */
 export const QUICK_PLAY_DEFAULT_BOTS = 2;
+
+/** How much one tap on the "Tempo por decisão" stepper changes (the bounds come from PROTOCOL_LIMITS). */
+export const TURN_SECONDS_STEP = 5;

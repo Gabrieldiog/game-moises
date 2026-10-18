@@ -51,9 +51,12 @@ export function statusLines(view: GameView, ctx: UiContext, picks: Picks): Statu
       const window = view.reactionWindow;
       const discarded = window ? T.reactionHint(nameOrYou(view, window.openedBy), cardShort(window.card)) : null;
       // While a shout is waiting for cards, the action bar says what to tap.
+      const left = window?.yourAttemptsLeft ?? null;
       const extra = ctx.canReact
-        ? null
-        : window && view.you !== null && window.attemptedBy.includes(view.you)
+        ? left !== null && window !== null && left < window.attemptsPerPlayer
+          ? T.attemptsLeft(left)
+          : null
+        : window && left === 0
           ? T.reactionDone
           : T.reactionClosed;
       return { title: T.reactionTitle, hint: [discarded, extra].filter(Boolean).join(' '), tone: 'hot' };
@@ -81,12 +84,7 @@ export function statusLines(view: GameView, ctx: UiContext, picks: Picks): Statu
 export function endCallLines(view: GameView): { title: string; hint: string | null } | null {
   const call = view.endCall;
   if (!call || view.phase === 'ended') return null;
-  const title =
-    call.reason === 'noCards'
-      ? T.endNoCards(nameOrYou(view, call.callerId))
-      : call.callerId === view.you
-        ? T.endCalledYou
-        : T.endCalled(playerName(view, call.callerId));
+  const title = call.callerId === view.you ? T.endCalledYou : T.endCalled(playerName(view, call.callerId));
   const pending = call.pending.map((id) => nameOrYou(view, id));
   return { title, hint: pending.length > 0 ? T.endPending(pending.join(', ')) : null };
 }

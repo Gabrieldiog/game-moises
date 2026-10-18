@@ -1,18 +1,29 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { Avatar } from '../components/Avatar';
 import { cx } from '../components/cx';
 import type { GameConnection, RoomView } from '../connection/types';
+import { knownPowerRanks } from '../game/powerRanks';
 import { T } from '../i18n/pt-BR';
+import { TableSettings } from './TableSettings';
 
 export interface WaitingRoomProps {
   readonly connection: GameConnection;
   readonly room: RoomView;
 }
 
-/** Waiting room: the code to share, who is sitting, bots, and the start button (enabled by the server). */
+/**
+ * Waiting room: the code to share, who is sitting and who is waiting in the
+ * queue, bots, table settings and the start button. What is allowed is the
+ * server's call: buttons only mirror RoomView and refusals come back as notices.
+ */
 export function WaitingRoom({ connection, room }: WaitingRoomProps) {
   const [copied, setCopied] = useState(false);
-  const you = room.seats.find((s) => s.isYou);
-  const isHost = you?.isHost ?? false;
+  const isHost = room.hostId === room.you;
+  const queued = room.queue.some((q) => q.id === room.you);
+  const { minPlayers, maxPlayers } = room.settings;
+  const seated = room.members.length;
+  const playing = room.status === 'playing';
+  const powerRanks = useMemo(() => knownPowerRanks(room.code, room.table.powers), [room.code, room.table.powers]);
 
   const copy = async () => {
     try {
@@ -26,65 +37,101 @@ export function WaitingRoom({ connection, room }: WaitingRoomProps) {
   return (
     <main className="lobby lobby--room">
       <header className="room__head">
-        {room.mode === 'online' ? (
-          <>
-            <h1 className="room__code" aria-label={T.roomTitle(room.code.split('').join(' '))}>
-              {room.code}
-            </h1>
-            <p className="room__share">{T.roomShare}</p>
-            <button type="button" className="btn btn--link" onClick={copy}>
-              {copied ? T.codeCopied : T.copyCode}
-            </button>
-          </>
-        ) : (
-          <h1 className="room__title">{T.botRoomTitle}</h1>
-        )}
+        {room.status === 'ended' && <p className="room__status">{T.roomEndedTitle}</p>}
+        {playing && <p className="room__status">{T.roomPlaying}</p>}
+        <h1 className="room__code" aria-label={T.roomTitle(room.code.split('').join(' '))}>
+          {room.code}
+        </h1>
+        <p className="room__share">{T.roomShare}</p>
+        <button type="button" className="btn btn--link" onClick={copy}>
+          {copied ? T.codeCopied : T.copyCode}
+        </button>
       </header>
 
       <section className="lobby__panel" aria-labelledby="seats-title">
         <h2 id="seats-title" className="room__count">
-          {T.seatsCount(room.seats.length, room.maxPlayers)}
+          {T.seatsCount(seated, maxPlayers)}
         </h2>
         <ul className="seats">
-          {room.seats.map((seat) => (
-            <li key={seat.id} className={cx('seats__item', seat.isYou && 'is-you')}>
-              <span className={cx('seats__avatar', seat.isBot && 'is-bot')} aria-hidden="true">
-                {seat.name.slice(0, 1).toUpperCase()}
-              </span>
-              <span className="seats__name">
-                {seat.name}
-                {seat.isYou && <span className="seats__meta"> ({T.you.toLowerCase()})</span>}
-              </span>
-              {seat.isHost && <span className="chip chip--muted">{T.host}</span>}
-              {seat.isBot && <span className="chip chip--bot">{T.bot}</span>}
-              {seat.isBot && isHost && (
-                <button type="button" className="btn btn--link seats__remove" onClick={() => connection.removeBot(seat.id)}>
-                  {T.removeBot(seat.name)}
-                </button>
-              )}
-            </li>
-          ))}
+          {room.members.map((member, i) => {
+            const isYou = member.id === room.you;
+            return (
+              <li key={member.id} className={cx('seats__item', isYou && 'is-you', !member.connected && 'is-offline')}>
+                <Avatar name={member.name} index={i} isBot={member.isBot} className="seats__avatar" />
+                <span className="seats__name">
+                  {member.name}
+                  {isYou && <span className="seats__meta"> ({T.you.toLowerCase()})</span>}
+                </span>
+                {member.isHost && <span className="chip chip--muted">{T.host}</span>}
+                {member.isBot && <span className="chip chip--bot">{T.bot}</span>}
+                {!member.connected && <span className="chip chip--last">{T.offline}</span>}
+                {member.isBot && isHost && !playing && (
+                  <button
+                    type="button"
+                    className="btn btn--link seats__remove"
+                    aria-label={T.removeBot(member.name)}
+                    onClick={() => void connection.removeBot(member.id)}
+                  >
+                    ×
+                  </button>
+                )}
+              </li>
+            );
+          })}
         </ul>
 
-        {room.canAddBot && (
-          <button type="button" className="btn btn--ghost" onClick={() => connection.addBot()}>
+        {isHost && !playing && seated < maxPlayers && (
+          <button type="button" className="btn btn--ghost" onClick={() => void connection.addBot()}>
             {T.addBot}
           </button>
         )}
+
+        {room.queue.length > 0 && (
+          <div className="queue">
+            <h3 className="queue__title">{T.queueTitle}</h3>
+            <ul className="seats">
+              {room.queue.map((q, i) => (
+                <li key={q.id} className={cx('seats__item', q.id === room.you && 'is-you', !q.connected && 'is-offline')}>
+                  <Avatar name={q.name} index={seated + i} className="seats__avatar" />
+                  <span className="seats__name">
+                    {q.name}
+                    {q.id === room.you && <span className="seats__meta"> ({T.you.toLowerCase()})</span>}
+                  </span>
+                  <span className="chip chip--muted">{T.waiting}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {queued && <p className="lobby__note">{T.queueYou}</p>}
       </section>
 
+      <TableSettings
+        table={room.table}
+        powerRanks={powerRanks}
+        editable={isHost && !playing}
+        onChange={(settings) => connection.setTable(settings)}
+      />
+
       <div className="room__actions">
-        {isHost ? (
+        {playing ? (
+          <p className="lobby__note">{T.queueHint}</p>
+        ) : isHost ? (
           <>
-            <button type="button" className="btn btn--primary btn--big" disabled={!room.canStart} onClick={() => connection.startGame()}>
-              {T.startGame}
+            <button
+              type="button"
+              className="btn btn--primary btn--big"
+              disabled={seated + room.queue.length < minPlayers}
+              onClick={() => void connection.startGame()}
+            >
+              {room.status === 'ended' ? T.playAgain : T.startGame}
             </button>
-            {!room.canStart && <p className="lobby__note">{T.minPlayersHint(room.minPlayers)}</p>}
+            {seated + room.queue.length < minPlayers && <p className="lobby__note">{T.minPlayersHint(minPlayers)}</p>}
           </>
         ) : (
-          <p className="lobby__note">{T.waitingHost}</p>
+          <p className="lobby__note">{room.status === 'ended' ? T.waitingHostAgain : T.waitingHost}</p>
         )}
-        <button type="button" className="btn btn--link" onClick={() => connection.leaveRoom()}>
+        <button type="button" className="btn btn--link" onClick={() => void connection.leaveRoom()}>
           {T.leaveRoom}
         </button>
       </div>

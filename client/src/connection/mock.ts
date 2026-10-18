@@ -1,4 +1,13 @@
-import { ROOM_CODE_ALPHABET, parseAction, type Action, type GameView, type RoomMemberView, type RoomView } from '@moises/shared';
+import {
+  ROOM_CODE_ALPHABET,
+  parseAction,
+  type Action,
+  type GameView,
+  type RoomMemberView,
+  type RoomView,
+  type SetTableSettingsPayload,
+  type TableSettingsView,
+} from '@moises/shared';
 import {
   DEMO_NAMES,
   DEMO_SCRIPT,
@@ -16,7 +25,7 @@ import type {
   RequestName,
   RequestResult,
 } from './types';
-import { checkBots, checkCode, checkName } from './validate';
+import { checkBots, checkCode, checkName, checkTable } from './validate';
 
 // Local stand-in for the game server, used ONLY by the demo mode (no
 // VITE_SERVER_URL, or ?demo=...). It answers lobby requests with fake rooms in
@@ -53,6 +62,7 @@ export class MockConnection implements GameConnection {
   private readonly sent: Action[] = [];
   private readonly now: () => number;
   private botSeq = 0;
+  private table: TableSettingsView = DEMO_SERVER.table;
 
   constructor(private readonly options: MockOptions = {}) {
     this.players = options.players ?? DEMO_SERVER.players.min;
@@ -141,8 +151,27 @@ export class MockConnection implements GameConnection {
     return Promise.resolve(OK);
   }
 
+  setTable(settings: SetTableSettingsPayload): Promise<RequestResult> {
+    const room = this.room;
+    if (!room) return this.refuse(error('NOT_IN_ROOM', 'room:setTable'));
+    if (room.hostId !== YOU) return this.refuse(error('NOT_HOST', 'room:setTable'));
+    if (room.status === 'playing') return this.refuse(error('GAME_IN_PROGRESS', 'room:setTable'));
+    const checked = checkTable(settings);
+    if (!checked.ok) return this.refuse(checked.error);
+    const available = new Set<string>(DEMO_SERVER.table.powers);
+    if (checked.value.powers.some((rank) => !available.has(rank))) return this.refuse(error('BAD_REQUEST', 'room:setTable'));
+    this.table = {
+      turnSeconds: checked.value.turnSeconds,
+      reactions: { ...checked.value.reactions },
+      powers: DEMO_SERVER.table.powers.filter((rank) => checked.value.powers.includes(rank)),
+    };
+    this.setRoom(room.code, room.status, room.hostId, room.members);
+    return Promise.resolve(OK);
+  }
+
   leaveRoom(): Promise<RequestResult> {
     this.clearTimer();
+    this.table = DEMO_SERVER.table;
     this.scenario = null;
     this.room = null;
     this.emit({ type: 'room', room: null });
@@ -226,8 +255,10 @@ export class MockConnection implements GameConnection {
       settings: {
         minPlayers: DEMO_SERVER.players.min,
         maxPlayers: DEMO_SERVER.players.max,
-        turnMs: DEMO_SERVER.timings.turnMs,
+        turnMs: this.table.turnSeconds * 1000,
       },
+      table: this.table,
+      queue: [],
     };
     this.emit({ type: 'room', room: this.room });
   }

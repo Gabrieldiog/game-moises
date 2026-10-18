@@ -9,7 +9,7 @@
   gap: 8px;
   padding: 10px var(--gutter);
   padding-bottom: calc(10px + env(safe-area-inset-bottom));
-  background: linear-gradient(to top, var(--mesa-borda) 70%, rgb(5 25 26 / 0));
+  background: linear-gradient(to top, var(--sala) 72%, rgb(18 14 11 / 0));
 }
 
 .actionbar__row {
@@ -50,6 +50,12 @@
   width: 100%;
 }
 
+.shouts--one {
+  grid-template-columns: 1fr;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
 .shout {
   position: relative;
   display: flex;
@@ -57,7 +63,7 @@
   align-items: flex-start;
   justify-content: center;
   gap: 4px;
-  min-height: 72px;
+  min-height: 66px;
   min-width: var(--touch);
   padding: 8px 12px;
   border: 3px solid var(--tinta);
@@ -137,49 +143,3 @@
   }
 }
 
-/* --- "Estou foda" confirmation ---------------------------------------------- */
-
-.confirm {
-  position: fixed;
-  z-index: 25;
-  left: 50%;
-  bottom: calc(12px + env(safe-area-inset-bottom));
-  transform: translateX(-50%);
-  width: min(calc(100vw - 2 * var(--gutter)), 460px);
-  padding: 16px;
-  background: var(--papel);
-  color: var(--tinta);
-  border: 3px solid var(--tinta);
-  border-radius: var(--radius-poster);
-  box-shadow: 6px 6px 0 var(--tinta);
-}
-
-.confirm__title {
-  font-family: var(--font-display);
-  font-size: 22px;
-  line-height: 1.1;
-}
-
-.confirm__hint {
-  margin-top: 4px;
-  font-weight: 600;
-}
-
-.confirm__row {
-  display: grid;
-  grid-template-columns: 1fr 1.4fr;
-  gap: 14px;
-  margin-top: 14px;
-}
-
-.confirm .btn--ghost {
-  color: var(--tinta);
-  border-color: var(--tinta);
-}
-
-.shout--confirm {
-  max-width: none;
-  min-height: 56px;
-  align-items: center;
-  transform: rotate(-1.5deg);
-}

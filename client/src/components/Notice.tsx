@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { ConnectionNotice } from '../connection/store';
-import { errorText, T } from '../i18n/pt-BR';
+import { ROOM_CLOSED_TEXT, errorText, T } from '../i18n/pt-BR';
 import { NOTICE_MS } from '../ui/constants';
 
 export interface NoticeProps {
@@ -17,9 +17,16 @@ export function Notice({ notice, onDismiss }: NoticeProps) {
   }, [notice, onDismiss]);
 
   if (!notice) return null;
+  const { content } = notice;
+  const text =
+    content.kind === 'error'
+      ? errorText(content.error)
+      : content.kind === 'roomClosed'
+        ? ROOM_CLOSED_TEXT[content.reason]
+        : T.sessionLost;
   return (
     <div className="notice" role="alert">
-      <span>{errorText(notice.error)}</span>
+      <span>{text}</span>
       <button type="button" className="notice__close" aria-label={T.dismiss} onClick={() => onDismiss(notice.id)}>
         ×
       </button>

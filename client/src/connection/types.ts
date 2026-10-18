@@ -5,6 +5,7 @@ import type {
   RoomClosed,
   RoomView,
   ServerErrorCode,
+  SetTableSettingsPayload,
 } from '@moises/shared';
 
 // Transport contract between the UI and whatever talks to the game server.
@@ -86,6 +87,8 @@ export interface GameConnection {
   addBot(): Promise<RequestResult>;
   removeBot(botId: string): Promise<RequestResult>;
   startGame(): Promise<RequestResult>;
+  /** "Configurações da mesa" (host only, outside a game). The server validates and answers with a new room:state. */
+  setTable(settings: SetTableSettingsPayload): Promise<RequestResult>;
   leaveRoom(): Promise<RequestResult>;
 
   /** Sends one game action. The server validates everything; the answer arrives as a new update or an error. */

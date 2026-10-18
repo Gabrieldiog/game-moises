@@ -1,4 +1,10 @@
-import { PlayerNameInputSchema, QuickPlayPayloadSchema, RoomCodeSchema } from '@moises/shared';
+import {
+  PlayerNameInputSchema,
+  QuickPlayPayloadSchema,
+  RoomCodeSchema,
+  TableSettingsSchema,
+  type SetTableSettingsPayload,
+} from '@moises/shared';
 import type { ConnectionError, RequestName } from './types';
 
 // Form checks with the same Zod schemas the server uses, so an obviously bad
@@ -27,4 +33,10 @@ export function checkCode(raw: string): Checked<string> {
 export function checkBots(bots: number): Checked<number> {
   const parsed = QuickPlayPayloadSchema.shape.bots.safeParse(bots);
   return parsed.success ? { ok: true, value: parsed.data } : refuse('BAD_REQUEST', 'room:quickPlay', 'invalid bot count');
+}
+
+/** Table settings in the shape the server accepts (bounds from the shared schema), or BAD_REQUEST. */
+export function checkTable(settings: SetTableSettingsPayload): Checked<SetTableSettingsPayload> {
+  const parsed = TableSettingsSchema.safeParse(settings);
+  return parsed.success ? { ok: true, value: parsed.data } : refuse('BAD_REQUEST', 'room:setTable', 'invalid table settings');
 }

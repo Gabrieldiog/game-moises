@@ -139,6 +139,18 @@ describe('Table', () => {
     expect(screen.getByRole('img', { name: 'Sua posição 2: vazia' })).toBeInTheDocument();
   });
 
+  it('counts the current decision down from GameUpdate.turnDeadline', () => {
+    const view = buildScenario('minha-vez', { players: 3, now: SERVER_NOW });
+    render(<Table view={view} clockOffset={SERVER_NOW - LOCAL_NOW} turnDeadline={SERVER_NOW + 15_000} onSend={() => {}} onLeave={() => {}} />);
+    expect(screen.getByRole('timer', { name: 'Tempo da jogada: 15 segundos restantes' })).toBeInTheDocument();
+  });
+
+  it('"Estou foda" goes with one tap', async () => {
+    const { onSend } = renderTable('minha-vez');
+    await user().click(screen.getByRole('button', { name: /Estou foda/ }));
+    expect(onSend).toHaveBeenCalledWith({ type: 'callEnd' });
+  });
+
   it('opens the final screen when the game ends', () => {
     renderTable('fim', 2);
     expect(screen.getByRole('dialog', { name: 'Fim de jogo' })).toBeInTheDocument();

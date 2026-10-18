@@ -42,11 +42,11 @@
 
 .card--hidden,
 .card--visible {
-  box-shadow: 0 2px 0 rgb(0 0 0 / 0.35);
+  box-shadow: var(--sombra-carta);
 }
 
 .card--empty {
-  background: rgb(0 0 0 / 0.16);
+  background: rgb(0 0 0 / 0.2);
   box-shadow: inset 0 0 0 2px rgb(244 238 221 / 0.22);
   border-radius: calc(var(--w) * 0.08);
 }
@@ -55,8 +55,8 @@
 .card.is-selectable {
   cursor: pointer;
   box-shadow:
-    0 0 0 2px rgb(244 238 221 / 0.55),
-    0 2px 0 rgb(0 0 0 / 0.35);
+    0 0 0 2px rgb(244 238 221 / 0.6),
+    var(--sombra-carta);
 }
 
 .card.is-selectable:hover {
@@ -140,7 +140,7 @@
 .card--king-red {
   box-shadow:
     0 0 0 2px var(--k-vermelho),
-    0 2px 0 rgb(0 0 0 / 0.35);
+    var(--sombra-carta);
 }
 
 /* --- grids ---------------------------------------------------------------- */
@@ -175,8 +175,8 @@
   height: 20px;
   padding: 0 5px;
   border-radius: 999px;
-  background: var(--mesa-funda);
-  color: var(--texto-suave);
+  background: rgb(10 8 6 / 0.85);
+  color: var(--papel);
   font-size: 12px;
   font-weight: 750;
   line-height: 20px;

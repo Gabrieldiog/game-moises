@@ -7,6 +7,8 @@ import { Grid } from './Grid';
 export interface EndScreenProps {
   readonly view: GameView;
   readonly onLeave: () => void;
+  /** When the room stays open after the game: back to the waiting room (offered first). */
+  readonly onBackToRoom?: () => void;
 }
 
 /** "−1" with a real minus sign. Totals come from the server as they are. */
@@ -23,7 +25,7 @@ function joinNames(names: readonly string[]): string {
  * Final screen: every card face up, each total and the winner(s), all taken
  * from view.result. Nothing is added up here.
  */
-export function EndScreen({ view, onLeave }: EndScreenProps) {
+export function EndScreen({ view, onLeave, onBackToRoom }: EndScreenProps) {
   const result = view.result;
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => headingRef.current?.focus(), []);
@@ -80,9 +82,16 @@ export function EndScreen({ view, onLeave }: EndScreenProps) {
             );
           })}
         </ol>
-        <button type="button" className="btn btn--primary end__leave" onClick={onLeave}>
-          {T.backToLobby}
-        </button>
+        <div className="end__actions">
+          {onBackToRoom && (
+            <button type="button" className="btn btn--primary end__leave" onClick={onBackToRoom}>
+              {T.backToRoom}
+            </button>
+          )}
+          <button type="button" className={`btn ${onBackToRoom ? 'btn--ghost' : 'btn--primary'} end__leave`} onClick={onLeave}>
+            {onBackToRoom ? T.leaveRoom : T.backToLobby}
+          </button>
+        </div>
       </div>
     </div>
   );

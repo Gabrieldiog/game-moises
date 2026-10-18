@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { parseAction, type Action, type GameView } from '@moises/shared';
@@ -75,7 +75,7 @@ describe('ActionBar by phase', () => {
       { playerId: 's3', slot: 3 },
     ];
     const { sent } = setup(scene('poder-k', 6), { own: [], opponents: targets });
-    await userEvent.click(screen.getByRole('button', { name: 'Espiar as cartas (2)' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Espiar as cartas (2/2)' }));
     expect(sent()).toEqual([{ type: 'usePower', power: 'peekManyAndSwap', targets }]);
   });
 
@@ -114,9 +114,34 @@ describe('ActionBar by phase', () => {
     expect(onShout.mock.calls).toEqual([['matchOwn'], ['matchOpponent']]);
   });
 
-  it('reaction window: shouts are off after you already reacted', () => {
+  it('reaction window: a first wrong try still leaves one attempt', () => {
     const view = scene('reacao');
-    const reacted: GameView = { ...view, reactionWindow: { ...view.reactionWindow!, attemptedBy: ['s0'] } };
+    const once: GameView = { ...view, reactionWindow: { ...view.reactionWindow!, attemptedBy: ['s0'], yourAttemptsLeft: 1 } };
+    setup(once);
+    expect(screen.getByRole('button', { name: /Filha da putinha!/ })).toBeEnabled();
+  });
+
+  it('reaction window: a reaction switched off at this table is not offered', () => {
+    const view = scene('reacao');
+    const onSend = vi.fn();
+    render(
+      <ActionBar
+        ctx={uiContext(view, NOW)}
+        picks={NO_PICKS}
+        shout={null}
+        onSend={onSend}
+        onShout={vi.fn()}
+        onCancel={vi.fn()}
+        reactions={{ matchOwn: false, matchOpponent: true }}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /Filha da putinha!/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /Filho da puta!/ })).toBeEnabled();
+  });
+
+  it('reaction window: shouts are off when your attempts ran out', () => {
+    const view = scene('reacao');
+    const reacted: GameView = { ...view, reactionWindow: { ...view.reactionWindow!, attemptedBy: ['s0'], yourAttemptsLeft: 0 } };
     setup(reacted);
     expect(screen.getByRole('button', { name: /Filha da putinha!/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /Filho da puta!/ })).toBeDisabled();
@@ -144,23 +169,11 @@ describe('CallEndButton ("Estou foda")', () => {
     return { ...utils, onSend };
   }
 
-  it('asks for confirmation before sending', async () => {
+  it('sends at once, with no confirmation', async () => {
     const { onSend } = renderEnd(scene('minha-vez'));
     await userEvent.click(screen.getByRole('button', { name: /Estou foda/ }));
-    expect(onSend).not.toHaveBeenCalled();
-    const dialog = screen.getByRole('alertdialog', { name: 'Falar “Estou foda”?' });
-    expect(within(dialog).getByRole('button', { name: 'Estou foda!' })).toHaveFocus();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Estou foda!' }));
-    expect(onSend).toHaveBeenCalledWith({ type: 'callEnd' });
+    expect(onSend).toHaveBeenCalledExactlyOnceWith({ type: 'callEnd' });
     expect(screen.queryByRole('alertdialog')).toBeNull();
-  });
-
-  it('can be cancelled', async () => {
-    const { onSend } = renderEnd(scene('minha-vez'));
-    await userEvent.click(screen.getByRole('button', { name: /Estou foda/ }));
-    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
-    expect(screen.queryByRole('alertdialog')).toBeNull();
-    expect(onSend).not.toHaveBeenCalled();
   });
 
   it('is offered in every step of your own turn', () => {

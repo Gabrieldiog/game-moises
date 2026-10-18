@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import type { Action, GameView } from '@moises/shared';
+import type { ReactNode } from 'react';
+import type { Action, GameView, TableSettingsView } from '@moises/shared';
 import {
   powerSwapAction,
   swapWithDrawnAction,
@@ -7,7 +7,7 @@ import {
   type Picks,
   type Shout,
 } from '../game/intent';
-import { canOfferCallEnd, contextKey, type UiContext } from '../game/selectors';
+import { canOfferCallEnd, type UiContext } from '../game/selectors';
 import { POWER_TEXT, T } from '../i18n/pt-BR';
 import { cx } from './cx';
 
@@ -18,7 +18,11 @@ export interface ActionBarProps {
   readonly onSend: (action: Action) => void;
   readonly onShout: (shout: Shout) => void;
   readonly onCancel: () => void;
+  /** Reactions switched on at this table (RoomView.table); both on when unknown. */
+  readonly reactions?: TableSettingsView['reactions'];
 }
+
+const ALL_REACTIONS: TableSettingsView['reactions'] = { matchOwn: true, matchOpponent: true };
 
 function Btn({
   children,
@@ -42,7 +46,7 @@ function Btn({
  * Only what the current moment allows. Buttons build typed actions from the
  * selected cards; the server still validates every one of them.
  */
-export function ActionBar({ ctx, picks, shout, onSend, onShout, onCancel }: ActionBarProps) {
+export function ActionBar({ ctx, picks, shout, onSend, onShout, onCancel, reactions = ALL_REACTIONS }: ActionBarProps) {
   let row: ReactNode = null;
   switch (ctx.kind) {
     case 'myDraw':
@@ -93,28 +97,34 @@ export function ActionBar({ ctx, picks, shout, onSend, onShout, onCancel }: Acti
       break;
     }
     case 'reaction':
-      row = (
-        <div className="shouts" role="group" aria-label="Reações">
-          <button
-            type="button"
-            className={cx('shout', 'shout--own', shout === 'matchOwn' && 'is-armed')}
-            disabled={!ctx.canReact}
-            onClick={() => onShout('matchOwn')}
-          >
-            <span className="shout__text">{T.shoutOwn}</span>
-            <span className="shout__hint">{T.shoutOwnHint}</span>
-          </button>
-          <button
-            type="button"
-            className={cx('shout', 'shout--opp', shout === 'matchOpponent' && 'is-armed')}
-            disabled={!ctx.canReact}
-            onClick={() => onShout('matchOpponent')}
-          >
-            <span className="shout__text">{T.shoutOpponent}</span>
-            <span className="shout__hint">{T.shoutOpponentHint}</span>
-          </button>
-        </div>
-      );
+      // A reaction switched off at this table is not offered at all (the server refuses it with REACTION_DISABLED).
+      row =
+        reactions.matchOwn || reactions.matchOpponent ? (
+          <div className={cx('shouts', !(reactions.matchOwn && reactions.matchOpponent) && 'shouts--one')} role="group" aria-label="Reações">
+            {reactions.matchOwn && (
+              <button
+                type="button"
+                className={cx('shout', 'shout--own', shout === 'matchOwn' && 'is-armed')}
+                disabled={!ctx.canReact}
+                onClick={() => onShout('matchOwn')}
+              >
+                <span className="shout__text">{T.shoutOwn}</span>
+                <span className="shout__hint">{T.shoutOwnHint}</span>
+              </button>
+            )}
+            {reactions.matchOpponent && (
+              <button
+                type="button"
+                className={cx('shout', 'shout--opp', shout === 'matchOpponent' && 'is-armed')}
+                disabled={!ctx.canReact}
+                onClick={() => onShout('matchOpponent')}
+              >
+                <span className="shout__text">{T.shoutOpponent}</span>
+                <span className="shout__hint">{T.shoutOpponentHint}</span>
+              </button>
+            )}
+          </div>
+        ) : null;
       break;
     default:
       row = null;
@@ -145,65 +155,14 @@ export interface CallEndButtonProps {
 
 /**
  * "Estou foda", offered during your own turn while nobody called the end.
- * It cannot be undone, so it opens a confirmation before sending.
+ * One tap sends it (the owner of the game asked for no confirmation).
  */
-export function CallEndButton({ view, ctx, onSend }: CallEndButtonProps) {
-  const key = contextKey(view, ctx);
-  const [openAt, setOpenAt] = useState<string | null>(null);
-  const confirmRef = useRef<HTMLButtonElement>(null);
-  const open = openAt === key && canOfferCallEnd(view);
-  useEffect(() => {
-    if (open) confirmRef.current?.focus();
-  }, [open]);
+export function CallEndButton({ view, onSend }: CallEndButtonProps) {
   if (!canOfferCallEnd(view)) return null;
-
   return (
-    <>
-      <button
-        type="button"
-        className={cx('shout', 'shout--end', open && 'is-armed')}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        onClick={() => setOpenAt(open ? null : key)}
-      >
-        <span className="shout__text">{T.callEnd}</span>
-        <span className="shout__hint">{T.callEndHint}</span>
-      </button>
-      {open && (
-        <div
-          className="confirm"
-          role="alertdialog"
-          aria-modal="false"
-          aria-labelledby="confirm-end-title"
-          aria-describedby="confirm-end-hint"
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') setOpenAt(null);
-          }}
-        >
-          <p id="confirm-end-title" className="confirm__title">
-            {T.callEndQuestion}
-          </p>
-          <p id="confirm-end-hint" className="confirm__hint">
-            {T.callEndHint}
-          </p>
-          <div className="confirm__row">
-            <button type="button" className="btn btn--ghost" onClick={() => setOpenAt(null)}>
-              {T.cancel}
-            </button>
-            <button
-              ref={confirmRef}
-              type="button"
-              className="shout shout--end shout--confirm"
-              onClick={() => {
-                setOpenAt(null);
-                onSend({ type: 'callEnd' });
-              }}
-            >
-              <span className="shout__text">{T.callEndConfirm}</span>
-            </button>
-          </div>
-        </div>
-      )}
-    </>
+    <button type="button" className="shout shout--end" onClick={() => onSend({ type: 'callEnd' })}>
+      <span className="shout__text">{T.callEnd}</span>
+      <span className="shout__hint">{T.callEndHint}</span>
+    </button>
   );
 }

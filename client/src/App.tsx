@@ -35,7 +35,7 @@ export interface AppProps {
 
 export function App({ config, mock }: AppProps) {
   const store = useStore();
-  const { status, room, view, clockOffset, notice, lastSent } = useConnectionState();
+  const { status, room, view, turnDeadline, clockOffset, knownSettings, notice, lastSent } = useConnectionState();
   const [savedName] = useState(readSavedName);
 
   useEffect(() => {
@@ -43,7 +43,8 @@ export function App({ config, mock }: AppProps) {
   }, [store]);
 
   const dismiss = useCallback((id: number) => store.dismissNotice(id), [store]);
-  const leave = useCallback(() => store.connection.leaveRoom(), [store]);
+  const leave = useCallback(() => void store.connection.leaveRoom(), [store]);
+  const backToRoom = useCallback(() => store.dismissGame(), [store]);
 
   const demo =
     config.demoTools && mock ? (placement: 'inline' | 'floating') => (
@@ -62,18 +63,34 @@ export function App({ config, mock }: AppProps) {
           {T.status[status]}
         </p>
       )}
-      {view ? (
+      {status === 'replaced' ? (
+        <main className="lobby lobby--replaced">
+          <h1 className="room__title">{T.replacedTitle}</h1>
+          <p className="lobby__note">{T.replacedHint}</p>
+          <button type="button" className="btn btn--primary btn--big" onClick={() => store.connection.connect()}>
+            {T.replacedTakeBack}
+          </button>
+        </main>
+      ) : view ? (
         <Table
           view={view}
           clockOffset={clockOffset}
+          turnDeadline={turnDeadline}
+          room={room}
           onSend={(action) => store.send(action)}
           onLeave={leave}
+          {...(room ? { onBackToRoom: backToRoom } : {})}
           statusExtra={demo?.('inline')}
         />
       ) : room ? (
         <WaitingRoom connection={store.connection} room={room} />
       ) : (
-        <Home connection={store.connection} initialName={savedName} onName={saveName} />
+        <Home
+          connection={store.connection}
+          initialName={savedName}
+          onName={saveName}
+          maxBots={knownSettings ? knownSettings.maxPlayers - 1 : null}
+        />
       )}
       {!view && demo?.('floating')}
       <Notice notice={notice} onDismiss={dismiss} />

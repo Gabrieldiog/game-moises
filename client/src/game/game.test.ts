@@ -66,7 +66,7 @@ describe('what the screen offers', () => {
     expect(uiContext(scene('espiada'), NOW).kind).toBe('initialPeek');
     expect(uiContext(scene('minha-vez'), NOW).kind).toBe('myDraw');
     expect(uiContext(scene('comprada'), NOW).kind).toBe('myDecide');
-    expect(uiContext(scene('poder-j'), NOW)).toEqual({ kind: 'myPower', power: 'peekAndSwap' });
+    expect(uiContext(scene('poder-j'), NOW)).toEqual({ kind: 'myPower', power: 'peekAndSwap', targetCount: 1 });
     expect(uiContext(scene('poder-k-troca'), NOW).kind).toBe('myPowerSwap');
     expect(uiContext(scene('reacao'), NOW)).toEqual({ kind: 'reaction', canReact: true });
     expect(uiContext(scene('vez-de-outro'), NOW)).toEqual({ kind: 'waiting', playerId: 's1' });
@@ -124,7 +124,7 @@ describe('card selection', () => {
 
   it('empty positions and your own seat are never opponent targets', () => {
     const view = scene('estou-foda', 4);
-    const policy = pickPolicy({ kind: 'myPower', power: 'peekOpponent' }, null);
+    const policy = pickPolicy({ kind: 'myPower', power: 'peekOpponent', targetCount: 1 }, null);
     const ana = view.players[1]!;
     expect(canPickOpponent(policy, ana, 0)).toBe(true);
     expect(canPickOpponent(policy, ana, 3)).toBe(false); // empty

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { Action, GameView, PlayerView } from '@moises/shared';
+import type { Action, GameView, PlayerView, RoomView } from '@moises/shared';
 import { useServerNow } from '../game/clock';
 import { canPickOpponent, canPickOwn } from '../game/intent';
 import {
@@ -30,14 +30,18 @@ export interface TableProps {
   readonly clockOffset: number;
   readonly onSend: (action: Action) => void;
   readonly onLeave: () => void;
+  /** GameUpdate.turnDeadline (server clock): time left for the current decision. */
+  readonly turnDeadline?: number | null;
+  /** The room around this game (table settings, bots, queue); null in tests or before it arrives. */
+  readonly room?: RoomView | null;
+  /** Closes the final screen and goes back to the room (the room stays open after a game). */
+  readonly onBackToRoom?: () => void;
   /** Extra control in the status bar (the demo panel button). */
   readonly statusExtra?: ReactNode;
 }
 
-const COUNTDOWN_LABEL = { arrange: 'Arrumação', initialPeek: 'Espiada', reaction: 'Reação' } as const;
-
-export function Table({ view, clockOffset, onSend, onLeave, statusExtra }: TableProps) {
-  const countdown = activeCountdown(view);
+export function Table({ view, clockOffset, onSend, onLeave, turnDeadline = null, room = null, onBackToRoom, statusExtra }: TableProps) {
+  const countdown = activeCountdown(view, turnDeadline);
   // Tick only while something on screen depends on the clock.
   const probe = Date.now() + clockOffset;
   const ticking = (countdown !== null && !serverDeadlinePassed(countdown.deadline, probe)) || hasTimedCards(view, probe);
@@ -51,6 +55,10 @@ export function Table({ view, clockOffset, onSend, onLeave, statusExtra }: Table
   const status = statusLines(view, ctx, intent.picks);
   const endCall = endCallLines(view);
 
+  const bots = new Set(room?.members.filter((m) => m.isBot).map((m) => m.id) ?? []);
+  const queued = room !== null && room.queue.some((q) => q.id === room.you);
+  const seatIndex = (id: string) => view.players.findIndex((p) => p.id === id);
+
   const seatsIn = (area: SeatArea) =>
     opponents.flatMap((player, i) => (areas[i] === area ? [renderSeat(player, area)] : []));
 
@@ -62,6 +70,8 @@ export function Table({ view, clockOffset, onSend, onLeave, statusExtra }: Table
         player={player}
         now={now}
         area={area}
+        seatIndex={seatIndex(player.id)}
+        isBot={bots.has(player.id)}
         isSelectable={(slot) => canPickOpponent(intent.policy, player, slot)}
         isSelected={(slot) => intent.picks.opponents.some((ref) => sameRef(ref, { playerId: player.id, slot }))}
         onSelect={(slot) => intent.pickOpponent({ playerId: player.id, slot })}
@@ -87,7 +97,7 @@ export function Table({ view, clockOffset, onSend, onLeave, statusExtra }: Table
           <Countdown
             deadline={countdown.deadline}
             now={now}
-            label={COUNTDOWN_LABEL[countdown.kind]}
+            label={T.countdown[countdown.kind]}
             tone={countdown.kind === 'reaction' ? 'hot' : 'calm'}
           />
         )}
@@ -101,27 +111,37 @@ export function Table({ view, clockOffset, onSend, onLeave, statusExtra }: Table
         </div>
       )}
 
-      <div className="table__felt">
-        <div className="table__top">{seatsIn('top')}</div>
-        <div className="table__middle">
-          <div className="table__side">{left}</div>
-          <Piles view={view} onDraw={ctx.kind === 'myDraw' ? () => intent.dispatch({ type: 'draw' }) : null} />
-          <div className="table__side">{right}</div>
+      {queued && view.phase !== 'ended' && (
+        <p className="queuebar" role="status">
+          {T.queueBanner}
+        </p>
+      )}
+
+      <div className="room">
+        <div className="rail">
+          <div className="felt">
+            <div className="felt__top">{seatsIn('top')}</div>
+            <div className="felt__middle">
+              <div className="felt__side">{left}</div>
+              <Piles view={view} onDraw={ctx.kind === 'myDraw' ? () => intent.dispatch({ type: 'draw' }) : null} />
+              <div className="felt__side">{right}</div>
+            </div>
+            {me ? (
+              <YouArea
+                view={view}
+                me={me}
+                now={now}
+                drawn={view.turn?.playerId === me.id ? view.turn.drawnCard : null}
+                isSelectable={(slot) => canPickOwn(intent.policy, me, slot)}
+                isSelected={(slot) => intent.picks.own.includes(slot)}
+                onSelect={intent.pickOwn}
+                beside={<CallEndButton view={view} ctx={ctx} onSend={intent.dispatch} />}
+              />
+            ) : (
+              <p className="felt__spectator">{T.spectating}</p>
+            )}
+          </div>
         </div>
-        {me ? (
-          <YouArea
-            view={view}
-            me={me}
-            now={now}
-            drawn={view.turn?.playerId === me.id ? view.turn.drawnCard : null}
-            isSelectable={(slot) => canPickOwn(intent.policy, me, slot)}
-            isSelected={(slot) => intent.picks.own.includes(slot)}
-            onSelect={intent.pickOwn}
-            beside={<CallEndButton view={view} ctx={ctx} onSend={intent.dispatch} />}
-          />
-        ) : (
-          <p className="table__spectator">{T.spectating}</p>
-        )}
       </div>
 
       <ActionBar
@@ -131,9 +151,12 @@ export function Table({ view, clockOffset, onSend, onLeave, statusExtra }: Table
         onSend={intent.dispatch}
         onShout={intent.pressShout}
         onCancel={intent.cancel}
+        {...(room ? { reactions: room.table.reactions } : {})}
       />
 
-      {view.phase === 'ended' && <EndScreen view={view} onLeave={onLeave} />}
+      {view.phase === 'ended' && (
+        <EndScreen view={view} onLeave={onLeave} {...(onBackToRoom ? { onBackToRoom } : {})} />
+      )}
     </main>
   );
 }

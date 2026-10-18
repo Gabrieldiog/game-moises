@@ -3,6 +3,7 @@ import type { Card, GameView, PlayerView } from '@moises/shared';
 import { T } from '../i18n/pt-BR';
 import { CardView } from './CardView';
 import { cx } from './cx';
+import { Avatar } from './Avatar';
 import { Grid } from './Grid';
 
 export interface YouAreaProps {
@@ -26,15 +27,16 @@ export function YouArea({ view, me, now, drawn, isSelectable, isSelected, onSele
 
   return (
     <section className={cx('me', isTurn && 'is-turn')} aria-label="Suas cartas">
-      <div className="me__table">
-        <div className="me__beside">
-          <div className="seat__tag me__tag">
-            <span className="seat__name">{T.you}</span>
-          </div>
-          {called && <span className="chip chip--end">{T.callEnd}</span>}
-          {!called && lastTurn && <span className="chip chip--last">{T.finalTurnPending}</span>}
-          {beside}
+      <div className="me__head">
+        <div className="seat__tag me__tag">
+          <Avatar name={me.name} index={view.players.findIndex((p) => p.id === me.id)} />
+          <span className="seat__name">{T.you}</span>
         </div>
+        {called && <span className="chip chip--end">{T.callEnd}</span>}
+        {!called && lastTurn && <span className="chip chip--last">{T.finalTurnPending}</span>}
+      </div>
+      <div className="me__table">
+        <div className="me__beside">{beside}</div>
         <Grid
           player={me}
           now={now}

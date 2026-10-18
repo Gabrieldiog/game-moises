@@ -113,6 +113,7 @@ export const T = {
   codePlaceholder: 'Ex.: K7QX2M',
   join: 'Entrar',
   playBots: (n: number) => (n === 1 ? 'Jogar contra 1 bot' : `Jogar contra ${n} bots`),
+  botsCount: (n: number) => (n === 1 ? '1 bot' : `${n} bots`),
   fewerBots: 'Menos bots',
   moreBots: 'Mais bots',
   botsLabel: 'Bots',
@@ -137,6 +138,28 @@ export const T = {
   startGame: 'Começar partida',
   waitingHost: 'Esperando o anfitrião começar a partida.',
   leaveRoom: 'Sair da sala',
+  queueTitle: 'Na fila para a próxima partida',
+  queueYou: 'Você está na fila. Entra na próxima partida; enquanto isso, assiste a esta.',
+  queueHint: 'Partida em andamento. Quem chegou agora joga a próxima.',
+  roomPlaying: 'Partida em andamento',
+  watchGame: 'Assistir à partida',
+  waiting: 'esperando',
+
+  // table settings ("Configurações da mesa")
+  tableTitle: 'Configurações da mesa',
+  tableReadOnly: 'Só o anfitrião muda as configurações.',
+  turnSecondsLabel: 'Tempo por decisão',
+  turnSecondsValue: (s: number) => `${s} s`,
+  lessTime: 'Menos tempo',
+  moreTime: 'Mais tempo',
+  reactionsLabel: 'Reações',
+  powersLabel: 'Cartas com poder',
+  powersHint: 'Desligada, a carta só vale os pontos.',
+  powersNone: 'Nenhuma carta com poder.',
+  on: 'ligada',
+  off: 'desligada',
+  rankShort: (rank: Rank) => (rank === 'K' ? 'K preto' : rank),
+  tableSaved: 'Configurações salvas',
 
   // table
   deck: 'Monte',
@@ -157,6 +180,9 @@ export const T = {
   calledEnd: 'falou “Estou foda”',
   reacted: 'já reagiu',
   secondsLeft: (s: number) => (s === 1 ? '1 segundo restante' : `${s} segundos restantes`),
+  countdown: { arrange: 'Arrumação', initialPeek: 'Espiada', reaction: 'Reação', turn: 'Tempo da jogada' },
+  attemptsLeft: (n: number) => (n === 1 ? 'Você tem mais 1 tentativa.' : `Você tem mais ${n} tentativas.`),
+  queueBanner: 'Você está na fila: joga a próxima partida.',
 
   // status lines
   arrangeTitle: 'Arrume suas cartas',
@@ -172,7 +198,7 @@ export const T = {
   powerSwapHintOne: 'Toque numa carta sua para trocar com a que você viu. Ou deixe tudo como está.',
   reactionTitle: 'Tem igual?',
   reactionHint: (who: string, card: string) => `${who} descartou ${card}.`,
-  reactionDone: 'Você já reagiu a este descarte.',
+  reactionDone: 'Suas tentativas neste descarte acabaram.',
   reactionClosed: 'A janela de reação fechou.',
   waitingDraw: 'Comprando uma carta.',
   waitingDecide: 'Decidindo o que fazer com a carta.',
@@ -181,7 +207,6 @@ export const T = {
   spectating: 'Você está assistindo.',
   endCalled: (name: string) => `${name} falou “Estou foda”!`,
   endCalledYou: 'Você falou “Estou foda”!',
-  endNoCards: (name: string) => `${name} ficou sem cartas!`,
   endPending: (names: string) => `Última vez de: ${names}.`,
 
   // actions
@@ -207,8 +232,6 @@ export const T = {
   shoutOpponentPickGive: 'Agora toque na carta sua que vai entregar.',
   cancel: 'Cancelar',
   callEnd: 'Estou foda',
-  callEndQuestion: 'Falar “Estou foda”?',
-  callEndConfirm: 'Estou foda!',
   callEndHint: 'Cada um joga mais uma vez e a partida acaba.',
 
   // end
@@ -271,7 +294,8 @@ const GAME_ERROR_TEXT: Record<ErrorCode, string> = {
   DUPLICATE_TARGET: 'Você escolheu a mesma carta duas vezes.',
   TARGET_NOT_PEEKED: 'Só dá para trocar com uma carta que você acabou de ver.',
   REACTION_WINDOW_CLOSED: 'Tarde demais: a janela de reação fechou.',
-  REACTION_ALREADY_ATTEMPTED: 'Você já reagiu a este descarte.',
+  REACTION_ALREADY_ATTEMPTED: 'Suas tentativas neste descarte acabaram.',
+  REACTION_DISABLED: 'Essa reação está desligada nesta mesa.',
   END_ALREADY_CALLED: 'Alguém já falou “Estou foda”.',
 };
 
@@ -291,7 +315,7 @@ const PROTOCOL_ERROR_TEXT: Record<ProtocolErrorCode, string> = {
   NOT_ENOUGH_PLAYERS: 'Faltam jogadores para começar. Chame alguém ou adicione um bot.',
   NOT_A_BOT: 'Só dá para tirar bots da sala.',
   NO_GAME: 'Não tem partida rolando nesta sala.',
-  GAME_IN_PROGRESS: 'Não dá para mudar a sala durante a partida.',
+  GAME_IN_PROGRESS: 'Não dá para fazer isso com a partida rolando. Espere ela acabar.',
 };
 
 const CLIENT_ERROR_TEXT: Record<ClientErrorCode, string> = {
@@ -308,6 +332,7 @@ const REQUEST_ERROR_TEXT: Partial<Record<RequestName, Partial<Record<ConnectionE
   'room:join': {
     RATE_LIMITED: 'Muitas tentativas. Espere alguns minutos.',
     BAD_REQUEST: 'Confira o código da sala e o seu nome.',
+    ROOM_FULL: 'Essa sala está cheia, e a fila para a próxima partida também.',
   },
   'room:create': { BAD_REQUEST: 'Confira o seu nome.' },
   'room:quickPlay': {
@@ -315,6 +340,13 @@ const REQUEST_ERROR_TEXT: Partial<Record<RequestName, Partial<Record<ConnectionE
     BAD_REQUEST: 'Confira o seu nome e a quantidade de bots.',
   },
   'room:addBot': { ROOM_FULL: 'A mesa já está cheia.' },
+  'room:removeBot': { GAME_IN_PROGRESS: 'Não dá para tirar bots com a partida rolando.' },
+  'room:start': { GAME_IN_PROGRESS: 'A partida já começou.' },
+  'room:setTable': {
+    BAD_REQUEST: 'O servidor recusou essas configurações. Confira e tente de novo.',
+    GAME_IN_PROGRESS: 'As configurações só mudam fora da partida.',
+    NOT_HOST: 'Só o anfitrião muda as configurações da mesa.',
+  },
   'session:resume': { RATE_LIMITED: 'Não deu para voltar à partida agora. Espere um pouco.' },
   'game:action': {
     RATE_LIMITED: 'Calma! Jogadas demais seguidas. Espere um instante.',

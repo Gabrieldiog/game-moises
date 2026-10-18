@@ -8,6 +8,7 @@ import {
   type JoinedRoom,
   type RoomView,
   type ServerToClientEvents,
+  type SetTableSettingsPayload,
 } from '@moises/shared';
 import { REQUEST_TIMEOUT_MS } from '../ui/constants';
 import { sessionTokenStore, type TokenStore } from './token';
@@ -21,7 +22,7 @@ import type {
   RequestName,
   RequestResult,
 } from './types';
-import { checkBots, checkCode, checkName } from './validate';
+import { checkBots, checkCode, checkName, checkTable } from './validate';
 
 // The real transport: Socket.IO to the game server at VITE_SERVER_URL, with the
 // typed events of @moises/shared (docs/PROTOCOLO.md). This class only moves
@@ -171,6 +172,12 @@ export class SocketConnection implements GameConnection {
 
   startGame(): Promise<RequestResult> {
     return this.call('room:start', {});
+  }
+
+  setTable(settings: SetTableSettingsPayload): Promise<RequestResult> {
+    const checked = checkTable(settings);
+    if (!checked.ok) return Promise.resolve(this.refused(checked.error));
+    return this.call('room:setTable', checked.value);
   }
 
   async leaveRoom(): Promise<RequestResult> {

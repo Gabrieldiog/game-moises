@@ -99,7 +99,8 @@ export function uiContext(view: GameView, serverNow: number): UiContext {
   const window = view.reactionWindow;
   if (window) {
     const open = window.deadline > serverNow;
-    const canReact = open && !window.attemptedBy.includes(view.you);
+    // The server says how many attempts the viewer has left (2 per window by default).
+    const canReact = open && (window.yourAttemptsLeft ?? 0) > 0;
     return { kind: 'reaction', canReact };
   }
 
