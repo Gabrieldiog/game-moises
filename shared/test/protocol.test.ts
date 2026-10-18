@@ -12,6 +12,7 @@ import {
   ROOM_CODE_ALPHABET,
   RoomCodeSchema,
   SessionTokenSchema,
+  TableSettingsSchema,
   sanitizePlayerName,
   type ClientEventName,
 } from '../src/index.js';
@@ -113,8 +114,33 @@ describe('CLIENT_EVENT_NAMES', () => {
       'room:addBot': true,
       'room:removeBot': true,
       'room:start': true,
+      'room:setTable': true,
       'game:action': true,
     };
     expect([...CLIENT_EVENT_NAMES].sort()).toEqual(Object.keys(all).sort());
+  });
+});
+
+describe('TableSettingsSchema (room:setTable)', () => {
+  const valid = { turnSeconds: 15, reactions: { matchOwn: true, matchOpponent: false }, powers: ['7', 'Q'] };
+
+  it('accepts valid settings', () => {
+    expect(TableSettingsSchema.safeParse(valid).success).toBe(true);
+    expect(TableSettingsSchema.safeParse({ ...valid, powers: [] }).success).toBe(true);
+  });
+
+  it.each([
+    ['too fast', { ...valid, turnSeconds: 4 }],
+    ['too slow', { ...valid, turnSeconds: 61 }],
+    ['fractional', { ...valid, turnSeconds: 7.5 }],
+    ['string number', { ...valid, turnSeconds: '15' }],
+    ['unknown rank', { ...valid, powers: ['1'] }],
+    ['repeated rank', { ...valid, powers: ['7', '7'] }],
+    ['reaction not boolean', { ...valid, reactions: { matchOwn: 1, matchOpponent: true } }],
+    ['missing reaction', { ...valid, reactions: { matchOwn: true } }],
+    ['extra field', { ...valid, rules: {} }],
+    ['not an object', 'x'],
+  ])('rejects %s', (_name, payload) => {
+    expect(TableSettingsSchema.safeParse(payload).success).toBe(false);
   });
 });

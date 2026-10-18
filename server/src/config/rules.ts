@@ -50,8 +50,12 @@ export const RulesConfigSchema = z
       peekManyCount: z.number().int().min(1).max(PROTOCOL_LIMITS.maxPowerTargets),
     }),
     reactions: z.strictObject({
-      /** Reaction attempts each player may make per window. */
+      /** Reaction attempts (wrong ones included; a right one closes the window) each player may make per window. */
       attemptsPerWindow: z.number().int().min(1).max(10),
+      /** Reaction "filha da putinha" (shed one of your own cards) allowed. Table setting. */
+      matchOwn: z.boolean(),
+      /** Reaction "filho da puta" (take an opponent's card) allowed. Table setting. */
+      matchOpponent: z.boolean(),
       /** Whether the two jokers count as "the same number". */
       jokersMatchEachOther: z.boolean(),
     }),
@@ -141,7 +145,9 @@ export const DEFAULT_RULES: RulesConfig = deepFreeze({
     peekManyCount: 2, // black K sees two opponent cards
   },
   reactions: {
-    attemptsPerWindow: 1, // default chosen for this release (not in REGRAS.md)
+    attemptsPerWindow: 2, // owner decision 4 (18/10): up to 2 wrong reactions per player per discard
+    matchOwn: true,
+    matchOpponent: true,
     jokersMatchEachOther: true, // default chosen for this release (not in REGRAS.md)
   },
   timings: {
@@ -149,7 +155,7 @@ export const DEFAULT_RULES: RulesConfig = deepFreeze({
     initialPeekMs: 5_000,
     reactionWindowMs: 3_000, // [SUPOSIÇÃO] 3 s
     revealMs: 3_000, // "um tempo curto" / "alguns segundos" — default chosen for this release
-    turnMs: 30_000, // v0.2: 30 s per decision of the turn — default chosen for this release
+    turnMs: 15_000, // owner decision 9 (18/10): 15 s per decision by default (host can change it per table)
   },
 });
 

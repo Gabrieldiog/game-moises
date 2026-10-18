@@ -170,11 +170,20 @@ describe('reaction window', () => {
     expect(game.state.reaction).toBeNull();
   });
 
-  it('one attempt per player per window', () => {
+  it('two attempts per player per window (default); the third is refused', () => {
     const game = windowOpenWith('6C');
     game.act('p2', { type: 'matchOwn', slot: 2 }); // wrong
+    game.act('p2', { type: 'matchOwn', slot: 3 }); // wrong again (second and last attempt)
     expect(game.fail('p2', { type: 'matchOwn', slot: 0 })).toBe('REACTION_ALREADY_ATTEMPTED');
-    expect(game.view('p1').reactionWindow?.attemptedBy).toEqual(['p2']);
+    expect(game.view('p1').reactionWindow).toMatchObject({ attemptedBy: ['p2'], attemptsPerPlayer: 2, yourAttemptsLeft: 2 });
+    expect(game.view('p2').reactionWindow?.yourAttemptsLeft).toBe(0);
+  });
+
+  it('a right reaction still closes the window for everyone', () => {
+    const game = windowOpenWith('6C');
+    game.act('p2', { type: 'matchOwn', slot: 2 }); // wrong
+    game.act('p2', { type: 'matchOwn', slot: 0 }); // right (6)
+    expect(game.state.reaction).toBeNull();
   });
 
   it('accepts a reaction until just before the deadline, refuses it at the deadline', () => {

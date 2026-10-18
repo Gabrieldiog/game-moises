@@ -57,6 +57,11 @@ export function viewFor(state: GameState, viewerId: PlayerId, now: number): Game
           openedBy: s.reaction.openedBy,
           deadline: s.reaction.deadline,
           attemptedBy: [...new Set(s.reaction.attempts)],
+          attemptsPerPlayer: s.rules.reactions.attemptsPerWindow,
+          yourAttemptsLeft:
+            you === null
+              ? null
+              : Math.max(0, s.rules.reactions.attemptsPerWindow - s.reaction.attempts.filter((id) => id === you).length),
         }
       : null,
     discardTop: top ? publicCard(top) : null,

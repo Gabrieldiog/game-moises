@@ -77,6 +77,7 @@ export class GameSession {
   private autoTurn: number | null = null;
   private outbox: ServerGameEvent[] = [];
   private readonly random: () => number;
+  private readonly botTuning: BotTuning | undefined;
   private readonly botDelay: { readonly min: number; readonly max: number };
   readonly stats: SessionStats = { timeouts: 0, botRejected: 0, botActions: 0 };
   /** Increases on every change, so the room knows when to send updates. */
@@ -94,6 +95,7 @@ export class GameSession {
     if (!created.ok) throw new Error(`GameSession: ${created.error.code}: ${created.error.message}`);
     this.state = created.state;
     this.random = options.random;
+    this.botTuning = options.botTuning;
     this.botDelay = options.botDelayMs;
     const knowledge = botKnowledge(created.state.rules);
     for (const player of options.players) {
@@ -122,6 +124,21 @@ export class GameSession {
   /** The bot playing a seat (tests). */
   botFor(playerId: PlayerId): Bot | undefined {
     return this.bots.get(playerId)?.bot;
+  }
+
+  /**
+   * A human left: the same seat is played by a bot from now on. The bot starts
+   * with what that seat can see now (its own view), nothing more. Returns false
+   * if the player is unknown, already a bot, or the game is over.
+   */
+  replaceWithBot(playerId: PlayerId, now: number): boolean {
+    if (this.state.phase === 'ended' || this.bots.has(playerId)) return false;
+    if (!this.state.players.some((p) => p.id === playerId)) return false;
+    const knowledge = botKnowledge(this.state.rules);
+    this.bots.set(playerId, { bot: new Bot(playerId, knowledge, this.random, this.botTuning), wakeAt: null });
+    this.version += 1;
+    this.notifyBots([], now);
+    return true;
   }
 
   /** What one player may see now. */

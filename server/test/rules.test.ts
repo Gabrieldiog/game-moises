@@ -34,11 +34,12 @@ describe('DEFAULT_RULES', () => {
       initialPeekMs: 5000,
       reactionWindowMs: 3000,
       revealMs: 3000,
-      turnMs: 30000,
+      turnMs: 15000,
     });
     expect(DEFAULT_RULES.cards.redOverrides.K).toEqual({ value: -1, power: null });
     expect(DEFAULT_RULES.cards.joker).toEqual({ value: 0, power: null });
     expect(DEFAULT_RULES.powers.peekManyCount).toBe(2);
+    expect(DEFAULT_RULES.reactions).toMatchObject({ attemptsPerWindow: 2, matchOwn: true, matchOpponent: true });
   });
 });
 

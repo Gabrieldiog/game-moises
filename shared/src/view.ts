@@ -54,7 +54,12 @@ export interface ReactionWindowView {
   readonly card: Card;
   readonly openedBy: PlayerId;
   readonly deadline: number;
+  /** Players who tried at least once in this window. */
   readonly attemptedBy: readonly PlayerId[];
+  /** Attempts each player gets per window (rule, default 2); a right one closes the window. */
+  readonly attemptsPerPlayer: number;
+  /** Attempts the viewer still has in this window; null for a spectator. */
+  readonly yourAttemptsLeft: number | null;
 }
 
 export interface EndCallView {

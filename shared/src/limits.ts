@@ -14,6 +14,9 @@ export const PROTOCOL_LIMITS = {
   maxSlotIndex: 15,
   /** Most targets a single power message may name. */
   maxPowerTargets: 8,
+  /** Table settings: time per decision, in seconds. */
+  tableTurnSecondsMin: 5,
+  tableTurnSecondsMax: 60,
   /** Most bots a single quick-play request may ask for (the rules cap it further). */
   maxBotsPerRequest: 15,
 } as const;

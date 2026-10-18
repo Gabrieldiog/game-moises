@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ActionSchema, PlayerIdSchema, PlayerNameSchema, type Action } from './actions.js';
 import type { ErrorCode } from './errors.js';
 import type { GameEvent } from './events.js';
+import { RANKS, type Rank } from './cards.js';
 import type { PlayerId, TurnStep } from './game.js';
 import { PROTOCOL_LIMITS } from './limits.js';
 import type { GameView } from './view.js';
@@ -82,6 +83,22 @@ export type ResumeSessionPayload = z.input<typeof ResumeSessionPayloadSchema>;
 export const RemoveBotPayloadSchema = z.strictObject({ playerId: PlayerIdSchema });
 export type RemoveBotPayload = z.input<typeof RemoveBotPayloadSchema>;
 
+/**
+ * "Configurações da mesa": the host sets them in the lobby (or between games)
+ * before starting. They become the rules of the next game of the room.
+ * `powers` lists the ranks whose power is on (a rank with no power in the
+ * server rules is refused).
+ */
+export const TableSettingsSchema = z.strictObject({
+  turnSeconds: z.number().int().min(PROTOCOL_LIMITS.tableTurnSecondsMin).max(PROTOCOL_LIMITS.tableTurnSecondsMax),
+  reactions: z.strictObject({ matchOwn: z.boolean(), matchOpponent: z.boolean() }),
+  powers: z
+    .array(z.enum(RANKS))
+    .max(RANKS.length)
+    .refine((ranks) => new Set(ranks).size === ranks.length, 'powers must not repeat'),
+});
+export type SetTableSettingsPayload = z.input<typeof TableSettingsSchema>;
+
 /** Events without data take `{}` (or nothing). */
 export const EmptyPayloadSchema = z.strictObject({}).optional();
 export type EmptyPayload = Record<string, never>;
@@ -99,7 +116,24 @@ export interface RoomMemberView {
   readonly name: string;
   readonly isBot: boolean;
   readonly isHost: boolean;
-  /** Bots are always connected. A human who left during a game stays seated as disconnected. */
+  /** Bots are always connected. A human who dropped (did not leave) during a game stays seated as disconnected. A human who leaves is replaced by a bot (isBot becomes true, same id). */
+  readonly connected: boolean;
+}
+
+/** Table settings as the room currently has them. */
+export interface TableSettingsView {
+  /** Time per decision of the turn, in seconds (default 15). */
+  readonly turnSeconds: number;
+  /** "Filha da putinha" (matchOwn) and "filho da puta" (matchOpponent), each on or off. */
+  readonly reactions: { readonly matchOwn: boolean; readonly matchOpponent: boolean };
+  /** Ranks whose power is on, in rank order. */
+  readonly powers: readonly Rank[];
+}
+
+/** Someone waiting for the next game (joined while a game was running). */
+export interface QueuedMemberView {
+  readonly id: PlayerId;
+  readonly name: string;
   readonly connected: boolean;
 }
 
@@ -119,6 +153,10 @@ export interface RoomView {
   /** In seat order (the order of the next game). */
   readonly members: readonly RoomMemberView[];
   readonly settings: RoomSettingsView;
+  /** Current table settings (the next game uses them). */
+  readonly table: TableSettingsView;
+  /** Waiting for the next game, in arrival order. They are not in `members` and see the game as spectators. */
+  readonly queue: readonly QueuedMemberView[];
 }
 
 /** Server notices mixed into the event stream (not produced by the engine). */
@@ -180,9 +218,9 @@ export const PROTOCOL_ERROR_CODES = [
   /** The connection is already in a room (leave it first). */
   'ALREADY_IN_ROOM',
   'ROOM_NOT_FOUND',
-  /** No seat left (or too many bots requested). */
+  /** No seat left, or the waiting queue is full (or too many bots requested). */
   'ROOM_FULL',
-  /** The game already started; only seated players can come back. */
+  /** No longer returned by room:join (players who arrive mid-game are queued); kept for compatibility. */
   'ROOM_IN_GAME',
   /** Room limit reached (for the whole server or for this address). */
   'ROOM_LIMIT',
@@ -194,7 +232,7 @@ export const PROTOCOL_ERROR_CODES = [
   'NOT_A_BOT',
   /** No game in this room. */
   'NO_GAME',
-  /** Not allowed while a game is running. */
+  /** Not allowed while a game is running (start, add/remove bot, room:setTable). */
   'GAME_IN_PROGRESS',
 ] as const;
 
@@ -229,6 +267,7 @@ export interface ClientToServerEvents {
   'room:addBot': (payload: EmptyPayload, ack: AckFn<null>) => void;
   'room:removeBot': (payload: RemoveBotPayload, ack: AckFn<null>) => void;
   'room:start': (payload: EmptyPayload, ack: AckFn<null>) => void;
+  'room:setTable': (payload: SetTableSettingsPayload, ack: AckFn<null>) => void;
   'game:action': (payload: Action, ack: AckFn<null>) => void;
 }
 
@@ -243,6 +282,7 @@ export const CLIENT_EVENT_NAMES = [
   'room:addBot',
   'room:removeBot',
   'room:start',
+  'room:setTable',
   'game:action',
 ] as const satisfies readonly ClientEventName[];
 

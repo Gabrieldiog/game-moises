@@ -695,13 +695,13 @@ describe('"Estou foda": everybody else plays exactly one more turn, in seat orde
 });
 
 describe('a player left without cards, while holding a power', () => {
-  it('7 / 8: the power has nothing to look at and is skipped; the end is triggered', () => {
+  it('7 / 8: the power has nothing to look at and is skipped; the game goes on', () => {
     const game = playing({ grids: [['7S', '3S', '4S', '5S'], G2, G3], draws: ['7C'] });
     keepOnlySlot0(game, 'p1');
     game.act('p1', { type: 'draw' }).act('p1', { type: 'discardDrawn' });
     game.act('p1', { type: 'matchOwn', slot: 0 });
     expect(game.lastEvents).toContainEqual({ type: 'powerSkipped', playerId: 'p1', power: 'peekOwn', reason: 'unusable' });
-    expect(game.state.endCall).toEqual({ callerId: 'p1', reason: 'noCards', pending: ['p2', 'p3'] });
+    expect(game.state.endCall).toBeNull();
     expect(game.current).toBe('p2');
   });
 
@@ -835,8 +835,7 @@ interface ReactionMove {
 describe('fuzz: random full games checked against independent oracles', () => {
   const stats = {
     called: 0,
-    noCardsDuringOwnTurn: 0,
-    noCardsDuringOtherTurn: 0,
+    emptiedGrid: 0,
     lateAttempts: 0,
     rightOwn: 0,
     rightOpponent: 0,
@@ -935,7 +934,6 @@ describe('fuzz: random full games checked against independent oracles', () => {
       const move = reactionMove();
       if (!move) return false;
       const before = state;
-      const turnBefore = before.turn?.playerId;
       const reactorBefore = before.players.find((p) => p.id === move.id)?.grid ?? [];
       const result = mustWork(move.id, move.action);
       const after = result.state;
@@ -960,12 +958,8 @@ describe('fuzz: random full games checked against independent oracles', () => {
           expect(targetAfter[target.slot]).toEqual(reactorBefore[giveSlot]); // one of mine takes its place
           expect(reactorAfter[giveSlot]).toBeNull();
         }
-        const noCards = result.events.find((e) => e.type === 'endCalled' && e.reason === 'noCards');
-        if (noCards) {
-          expect(countCards(reactorAfter)).toBe(0);
-          if (turnBefore === move.id) stats.noCardsDuringOwnTurn++;
-          else stats.noCardsDuringOtherTurn++;
-        }
+        expect(result.events.some((e) => e.type === 'endCalled')).toBe(false); // running out of cards ends nothing
+        if (countCards(reactorAfter) === 0) stats.emptiedGrid++;
       } else {
         stats.wrong++;
         expect(types).toEqual(['reactionFailed']); // nothing else happens
@@ -1124,8 +1118,6 @@ describe('fuzz: random full games checked against independent oracles', () => {
 
   it('the fuzz really exercised the rules it claims to check', () => {
     expect(stats.called).toBeGreaterThan(3);
-    expect(stats.noCardsDuringOwnTurn).toBeGreaterThan(0);
-    expect(stats.noCardsDuringOtherTurn).toBeGreaterThan(0);
     expect(stats.lateAttempts).toBeGreaterThan(5);
     expect(stats.rightOwn).toBeGreaterThan(10);
     expect(stats.rightOpponent).toBeGreaterThan(3);

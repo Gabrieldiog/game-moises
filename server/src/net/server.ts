@@ -4,6 +4,7 @@ import { Server, type DefaultEventsMap, type Socket } from 'socket.io';
 import type { z } from 'zod';
 import {
   CLIENT_EVENT_NAMES,
+  TableSettingsSchema,
   CreateRoomPayloadSchema,
   EmptyPayloadSchema,
   GameActionPayloadSchema,
@@ -263,6 +264,7 @@ export function createGameServer(options: GameServerOptions): GameServer {
     on('room:addBot', EmptyPayloadSchema, () => rooms.addBot(socket.id));
     on('room:removeBot', RemoveBotPayloadSchema, (p) => rooms.removeBot(socket.id, p.playerId));
     on('room:start', EmptyPayloadSchema, () => rooms.start(socket.id));
+    on('room:setTable', TableSettingsSchema, (p) => rooms.setTable(socket.id, p));
     on('game:action', GameActionPayloadSchema, (action) => rooms.act(socket.id, action));
 
     socket.on('disconnect', () => {

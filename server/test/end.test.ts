@@ -1,14 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { GameEvent } from '@moises/shared';
 import { c, key, playing, type TestGame } from './helpers.js';
 
 const G1 = ['2S', '3S', '4S', '5S'];
 const G2 = ['2H', '3H', '4H', '5H'];
 const G3 = ['2D', '3D', '4D', '5D'];
-
-function turnStarts(events: GameEvent[]): string[] {
-  return events.flatMap((e) => (e.type === 'turnStarted' ? [e.playerId] : []));
-}
 
 /** Records every turn start while playing `turns` draw+discard turns. */
 function playTurns(game: TestGame, turns: number): string[] {
@@ -162,7 +157,7 @@ describe('end of game', () => {
   });
 });
 
-describe('a player without cards triggers the end', () => {
+describe('running out of cards does not end the game by itself', () => {
   /** Leaves `playerId` with a single card (slot 0); the rest goes to the discard pile. */
   function keepOnlyFirstCard(game: TestGame, playerId: string): void {
     const s = structuredClone(game.state);
@@ -173,43 +168,52 @@ describe('a player without cards triggers the end', () => {
     game.state = s;
   }
 
-  it('as if they had said "Estou foda": the others finish one turn each, they never play again', () => {
+  it('a player who sheds their last card keeps playing: no endCalled, no skipped turns', () => {
     const game = playing({ grids: [G1, ['6H', '3H', '4H', '5H'], G3], draws: ['6C'] });
     keepOnlyFirstCard(game, 'p2');
     game.act('p1', { type: 'draw' }).act('p1', { type: 'discardDrawn' });
     game.act('p2', { type: 'matchOwn', slot: 0 });
-    expect(game.lastEvents.map((e) => e.type)).toEqual([
-      'reactionSucceeded',
-      'endCalled',
-      'reactionWindowClosed',
-      'turnStarted',
-    ]);
-    expect(game.lastEvents[1]).toEqual({ type: 'endCalled', playerId: 'p2', reason: 'noCards' });
-    // p1's ongoing turn was its last one; p2 is skipped.
-    expect(turnStarts(game.lastEvents)).toEqual(['p3']);
-    expect(playTurns(game, 10)).toEqual(['p3']);
+    expect(game.lastEvents.map((e) => e.type)).toEqual(['reactionSucceeded', 'reactionWindowClosed', 'turnStarted']);
+    expect(game.state.endCall).toBeNull();
+    expect(game.grid('p2').every((slot) => slot === null)).toBe(true);
+    // p2 still gets its turns; the game goes on
+    expect(playTurns(game, 6)).toEqual(['p2', 'p3', 'p1', 'p2', 'p3', 'p1']);
+    expect(game.state.phase).toBe('playing');
+  });
+
+  it('the player with 0 cards can call "Estou foda" on their turn; everyone else plays one more turn', () => {
+    const game = playing({ grids: [G1, ['6H', '3H', '4H', '5H'], G3], draws: ['6C'] });
+    keepOnlyFirstCard(game, 'p2');
+    game.act('p1', { type: 'draw' }).act('p1', { type: 'discardDrawn' });
+    game.act('p2', { type: 'matchOwn', slot: 0 });
+    expect(game.current).toBe('p2');
+    game.act('p2', { type: 'callEnd' });
+    expect(game.state.endCall).toEqual({ callerId: 'p2', reason: 'called', pending: ['p3', 'p1'] });
+    expect(playTurns(game, 10)).toEqual(['p2', 'p3', 'p1']);
     expect(game.state.phase).toBe('ended');
+    expect(game.state.result?.reason).toBe('endCalled');
     expect(game.state.result?.scores.find((s) => s.playerId === 'p2')?.total).toBe(0);
     expect(game.state.result?.winners).toEqual(['p2']);
   });
 
-  it('works when the current player empties their own grid', () => {
+  it('works when the current player empties their own grid: the game goes on', () => {
     const game = playing({ grids: [['6S', '3S', '4S', '5S'], G2, G3], draws: ['6C'] });
     keepOnlyFirstCard(game, 'p1');
     game.act('p1', { type: 'draw' }).act('p1', { type: 'discardDrawn' });
     game.act('p1', { type: 'matchOwn', slot: 0 });
-    expect(game.state.endCall).toEqual({ callerId: 'p1', reason: 'noCards', pending: ['p2', 'p3'] });
-    expect(playTurns(game, 10)).toEqual(['p2', 'p3']);
-    expect(game.state.phase).toBe('ended');
+    expect(game.state.endCall).toBeNull();
+    expect(game.current).toBe('p2'); // 6S has no power; the turn moved on
+    game.act('p2', { type: 'callEnd' });
+    expect(game.state.endCall).toMatchObject({ callerId: 'p2', reason: 'called' });
   });
 
-  it('by a matchOpponent: the reactor loses a card, the target keeps the count', () => {
+  it('by a matchOpponent: the reactor loses a card, the target keeps the count; nothing ends', () => {
     const game = playing({ grids: [G1, G2, ['AD', '3D', '4D', '5D']], draws: ['2C'] });
     keepOnlyFirstCard(game, 'p3');
     game.act('p1', { type: 'draw' }).act('p1', { type: 'discardDrawn' });
     game.act('p3', { type: 'matchOpponent', target: { playerId: 'p2', slot: 0 }, giveSlot: 0 }); // 2H
     expect(game.grid('p2')[0]).toEqual(c('AD'));
-    expect(game.state.endCall).toMatchObject({ callerId: 'p3', reason: 'noCards' });
+    expect(game.state.endCall).toBeNull();
   });
 
   it('does nothing more once the end was already called', () => {
