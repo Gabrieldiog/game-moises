@@ -65,3 +65,15 @@ Abrem a cada carta que vai para o descarte e duram uma janela curta (**[SUPOSIÇ
 - O **servidor é a autoridade**. Ele guarda o baralho e todas as cartas; cada jogador recebe só o que pode ver. O navegador nunca recebe cartas escondidas, então não dá para trapacear pelo DevTools.
 - O servidor valida toda ação: vez, fase, posse da carta e formato da mensagem.
 - Valores das cartas, tempos e limites ficam na configuração do servidor (`server/src/config`). O front-end exibe o que o servidor manda.
+
+## Detalhes decididos na implementação
+Pontos que a descrição original não cobria. Todos ficam em `server/src/config/rules.ts` quando faz sentido; podem ser revistos pelo dono do jogo.
+- Cada jogador tem **1 tentativa de reação por descarte**. Sem isso, dava para chutar posição por posição.
+- Uma reação **errada não fecha** a janela; a primeira **certa** fecha.
+- Só descartes do turno abrem janela de reação. O descarte feito por uma reação certa não abre outra.
+- O próximo turno só começa quando a janela de reação fecha.
+- Coringa casa com coringa. K vermelho casa com K preto (mesmo número).
+- Carta vista (poder ou erro de reação) fica aberta por **3 s**.
+- Poder sem alvo possível (ex.: inimigos sem cartas) é pulado automaticamente.
+- O descarte começa vazio.
+- Ainda não existe limite de tempo para o turno. Ele entra na v0.2, junto com os bots.
