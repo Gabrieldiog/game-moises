@@ -1,0 +1,186 @@
+/* --- final screen: the bar tab (comanda) ------------------------------------ */
+
+.end {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: max(16px, env(safe-area-inset-top)) var(--gutter) 16px;
+  overflow-y: auto;
+  background: rgb(5 25 26 / 0.82);
+}
+
+.end__sheet {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  margin: auto 0;
+  padding: 22px 18px 18px;
+  background: var(--papel);
+  color: var(--tinta);
+  border-radius: 4px;
+  box-shadow: 6px 6px 0 var(--tinta);
+  animation: tab-in 320ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+/* torn top edge of the tab */
+.end__sheet::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 0;
+  right: 0;
+  height: 9px;
+  background:
+    linear-gradient(135deg, transparent 50%, var(--papel) 50%) 0 0 / 12px 9px repeat-x,
+    linear-gradient(-135deg, transparent 50%, var(--papel) 50%) 0 0 / 12px 9px repeat-x;
+}
+
+@keyframes tab-in {
+  from {
+    transform: translateY(24px) rotate(-1.5deg);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.end__title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 34px;
+  line-height: 1;
+}
+
+.end__title:focus {
+  outline: none;
+}
+
+.end__reason {
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.end__headline {
+  display: inline-block;
+  margin: 14px 0 6px;
+  padding: 4px 10px;
+  background: var(--lambe-amarelo);
+  border: 2px solid var(--tinta);
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.1;
+  transform: rotate(-1.5deg);
+}
+
+.end__list {
+  margin-top: 10px;
+}
+
+.end__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 2px dashed rgb(0 0 0 / 0.35);
+}
+
+.end__row:last-child {
+  border-bottom: 2px dashed rgb(0 0 0 / 0.35);
+}
+
+.end__row.is-winner {
+  background: linear-gradient(transparent 8%, rgb(255 225 74 / 0.75) 8%, rgb(255 225 74 / 0.75) 92%, transparent 92%);
+}
+
+.end__who {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  padding-left: 6px;
+}
+
+.end__name {
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 17px;
+  font-weight: 800;
+  font-stretch: 88%;
+}
+
+.end__row .chip--win {
+  background: var(--tinta);
+  color: var(--lambe-amarelo);
+}
+
+/* on the tab the four cards sit in a row */
+.end__row .grid {
+  grid-template-columns: repeat(4, auto);
+  gap: 3px;
+}
+
+.end__row .card--empty {
+  box-shadow: inset 0 0 0 2px rgb(0 0 0 / 0.25);
+  background: rgb(0 0 0 / 0.06);
+}
+
+.end__row .card--hidden,
+.end__row .card--visible {
+  box-shadow: 0 1px 0 rgb(0 0 0 / 0.4);
+}
+
+.end__row .card--king-red {
+  box-shadow: 0 0 0 2px var(--k-vermelho);
+}
+
+.end__total {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 48px;
+  padding-right: 6px;
+}
+
+.end__total-label {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.end__total-num {
+  font-family: var(--font-display);
+  font-size: 30px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.end__leave {
+  width: 100%;
+  margin-top: 18px;
+  background: var(--tinta);
+  color: var(--papel);
+  border-color: var(--tinta);
+  box-shadow: none;
+}
+
+@media (max-width: 380px) {
+  .end__row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .end__row .grid {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: start;
+    padding-left: 6px;
+  }
+}

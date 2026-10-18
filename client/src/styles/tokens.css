@@ -1,0 +1,66 @@
+/*
+ * Visual tokens (colors, type, sizes). Purely visual constants, centralized
+ * here as the project rules allow. No game rule lives in CSS.
+ *
+ * Direction: "mesa de boteco + lambe-lambe". A calm petrol-blue tabletop under
+ * a warm lamp, wine azulejo card backs, and all the loudness spent on the
+ * shouts, printed like fluorescent street posters in wood type.
+ */
+:root {
+  /* table */
+  --mesa: #0e3b3c;
+  --mesa-luz: #1b5654;
+  --mesa-funda: #082627;
+  --mesa-borda: #05191a;
+
+  /* paper and ink */
+  --papel: #f4eedd;
+  --papel-sombra: #e2d7bc;
+  --tinta: #000;
+  --texto: var(--papel);
+  --texto-suave: rgb(244 238 221 / 0.78);
+  --linha: rgb(244 238 221 / 0.2);
+
+  /* card back */
+  --vinho: #7a1d2c;
+
+  /* lambe-lambe fluorescents (always with black ink) */
+  --lambe-amarelo: #ffe14a;
+  --lambe-rosa: #ff5ca8;
+  --lambe-laranja: #ff8a2b;
+
+  /* king markers */
+  --k-vermelho: #d3122f;
+  --k-preto: #000;
+
+  /* type */
+  --font-display: 'Alfa Slab One', 'Rockwell', 'Roboto Slab', serif;
+  --font-ui: 'Archivo Variable', 'Archivo', system-ui, sans-serif;
+
+  /* shape */
+  --gutter: 16px;
+  --radius-btn: 12px;
+  --radius-poster: 3px;
+  --radius-tag: 8px;
+  --poster-shadow: 4px 4px 0 var(--tinta);
+  --touch: 44px;
+
+  /* card widths (height = width x 7/5). Opponent cards never go under the 44px touch target. */
+  --card-you: clamp(64px, min(23vw, 14.4svh), 124px);
+  --card-opp: clamp(44px, min(11vw, 6.6svh), 60px);
+  --card-pile: clamp(52px, min(15vw, 9.4svh), 92px);
+  --card-hand: clamp(58px, min(19vw, 11.6svh), 108px);
+  --card-end: 34px;
+
+  color-scheme: dark;
+}
+
+@media (min-width: 900px) and (min-aspect-ratio: 5/4) {
+  :root {
+    --card-you: clamp(64px, 11.4svh, 124px);
+    --card-opp: clamp(44px, 5.4svh, 64px);
+    --card-pile: clamp(52px, 9.4svh, 96px);
+    --card-hand: clamp(58px, 11.6svh, 112px);
+    --card-end: 40px;
+  }
+}

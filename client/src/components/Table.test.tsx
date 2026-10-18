@@ -1,0 +1,147 @@
+import { act, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { parseAction, type Action } from '@moises/shared';
+import { buildScenario, DEMO_PLAYER_COUNTS, SCENARIOS, type ScenarioId } from '../demo/fixtures';
+import { Table } from './Table';
+
+const LOCAL_NOW = 2_000_000;
+const SERVER_NOW = 5_000;
+
+function renderTable(id: ScenarioId, players = 4) {
+  const view = buildScenario(id, { players, now: SERVER_NOW });
+  const onSend = vi.fn<(action: Action) => void>();
+  const utils = render(
+    <Table view={view} clockOffset={SERVER_NOW - LOCAL_NOW} onSend={onSend} onLeave={() => {}} />,
+  );
+  return { ...utils, view, onSend };
+}
+
+describe('Table', () => {
+  // Interaction tests only pin the clock; countdown tests also fake the interval.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(LOCAL_NOW);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const tickingClock = () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    vi.setSystemTime(LOCAL_NOW);
+  };
+
+  const user = () => userEvent.setup();
+
+  it.each(DEMO_PLAYER_COUNTS)('seats you at the bottom and %i-1 opponents around', (players) => {
+    renderTable('minha-vez', players);
+    expect(screen.getByRole('region', { name: 'Suas cartas' })).toBeInTheDocument();
+    expect(document.querySelectorAll('.seat')).toHaveLength(players - 1);
+  });
+
+  it('never renders a face that the view did not send', () => {
+    for (const { id } of SCENARIOS) {
+      for (const players of DEMO_PLAYER_COUNTS) {
+        const { view, unmount, container } = renderTable(id, players);
+        // The final screen repeats every grid on the score tab.
+        const copies = view.phase === 'ended' ? 2 : 1;
+        const visibleInGrids = copies * view.players.flatMap((p) => p.slots).filter((s) => s.state === 'visible').length;
+        const others = (view.discardTop || view.reactionWindow ? 1 : 0) + (view.turn?.drawnCard ? 1 : 0);
+        const faces = Array.from(container.querySelectorAll('img')).filter((img) => /\/cards\//.test(img.src));
+        expect(faces.length, `${id} with ${players}`).toBe(visibleInGrids + others);
+        unmount();
+      }
+    }
+  });
+
+  it('shows whose turn it is', () => {
+    renderTable('vez-de-outro');
+    expect(screen.getByRole('heading', { name: 'Vez de Ana' })).toBeInTheDocument();
+    expect(document.querySelector('.seat.is-turn .seat__name')).toHaveTextContent('Ana');
+  });
+
+  it('counts down from the server deadline and stops at zero', () => {
+    tickingClock();
+    renderTable('arrumacao');
+    expect(screen.getByRole('timer', { name: 'Arrumação: 5 segundos restantes' })).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(2_100));
+    expect(screen.getByRole('timer', { name: 'Arrumação: 3 segundos restantes' })).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(screen.getByRole('timer', { name: 'Arrumação: 0 segundos restantes' })).toBeInTheDocument();
+  });
+
+  it('turns the initial-peek cards face down when their time is over', () => {
+    tickingClock();
+    renderTable('espiada');
+    expect(screen.getByRole('img', { name: /Sua posição 4: Rei de copas/ })).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(5_100));
+    expect(screen.queryByRole('img', { name: /Rei de copas/ })).toBeNull();
+    expect(screen.getByRole('img', { name: 'Sua posição 4: carta virada para baixo' })).toBeInTheDocument();
+  });
+
+  it('arrange: tapping two of your cards sends one arrange action', async () => {
+    const { onSend } = renderTable('arrumacao');
+    await user().click(screen.getByRole('button', { name: /Sua posição 1/ }));
+    expect(screen.getByText('Agora toque onde a posição 1 vai ficar.')).toBeInTheDocument();
+    await user().click(screen.getByRole('button', { name: /Sua posição 4/ }));
+    expect(onSend).toHaveBeenCalledWith({ type: 'arrange', fromSlot: 0, toSlot: 3 });
+  });
+
+  it('drawing: from the button or by tapping the deck', async () => {
+    const { onSend } = renderTable('minha-vez');
+    await user().click(screen.getByRole('button', { name: /Monte: .* Comprar/ }));
+    await user().click(screen.getByRole('button', { name: 'Comprar' }));
+    expect(onSend.mock.calls).toEqual([[{ type: 'draw' }], [{ type: 'draw' }]]);
+  });
+
+  it('holding a card: tap a position, then swap', async () => {
+    const { onSend } = renderTable('comprada');
+    expect(screen.getByRole('img', { name: /Sua carta: Rei de espadas \(preto\)/ })).toBeInTheDocument();
+    await user().click(screen.getByRole('button', { name: /Sua posição 2/ }));
+    expect(screen.getByRole('button', { name: /Sua posição 2/ })).toHaveAttribute('aria-pressed', 'true');
+    await user().click(screen.getByRole('button', { name: 'Trocar com a posição 2' }));
+    expect(onSend).toHaveBeenCalledWith({ type: 'swapWithDrawn', slot: 1 });
+  });
+
+  it('J power: tap an opponent card, then peek', async () => {
+    const { onSend } = renderTable('poder-j');
+    // Your own cards are not targets of this power.
+    expect(screen.queryByRole('button', { name: /Sua posição/ })).toBeNull();
+    await user().click(screen.getByRole('button', { name: /Beto, posição 3/ }));
+    await user().click(screen.getByRole('button', { name: 'Espiar a carta' }));
+    expect(onSend).toHaveBeenCalledWith({ type: 'usePower', power: 'peekAndSwap', target: { playerId: 's2', slot: 2 } });
+  });
+
+  it('"Filho da puta": shout first, then the target and the card you give', async () => {
+    const { onSend } = renderTable('reacao');
+    await user().click(screen.getByRole('button', { name: /Filho da puta!/ }));
+    expect(screen.getByText('Toque na carta igual do inimigo.')).toBeInTheDocument();
+    await user().click(screen.getByRole('button', { name: /Cida, posição 2/ }));
+    expect(screen.getByText('Agora toque na carta sua que vai entregar.')).toBeInTheDocument();
+    await user().click(screen.getByRole('button', { name: /Sua posição 4/ }));
+    expect(onSend).toHaveBeenCalledWith({ type: 'matchOpponent', target: { playerId: 's3', slot: 1 }, giveSlot: 3 });
+    expect(parseAction(onSend.mock.calls[0]![0]).ok).toBe(true);
+  });
+
+  it('"Filha da putinha": with your card already chosen it goes at once', async () => {
+    const { onSend } = renderTable('reacao');
+    await user().click(screen.getByRole('button', { name: /Sua posição 1/ }));
+    await user().click(screen.getByRole('button', { name: /Filha da putinha!/ }));
+    expect(onSend).toHaveBeenCalledWith({ type: 'matchOwn', slot: 0 });
+  });
+
+  it('shows the "Estou foda" banner with who still plays', () => {
+    renderTable('estou-foda', 4);
+    const banner = screen.getByRole('status');
+    expect(within(banner).getByText('Ana falou “Estou foda”!')).toBeInTheDocument();
+    expect(within(banner).getByText('Última vez de: Beto, Cida, Você.')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Sua posição 2: vazia' })).toBeInTheDocument();
+  });
+
+  it('opens the final screen when the game ends', () => {
+    renderTable('fim', 2);
+    expect(screen.getByRole('dialog', { name: 'Fim de jogo' })).toBeInTheDocument();
+    expect(screen.getByText('Você ganhou!')).toBeInTheDocument();
+  });
+});

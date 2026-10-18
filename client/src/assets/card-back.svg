@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 336">
+  <defs>
+    <pattern id="azulejo" width="36" height="36" x="30" y="6" patternUnits="userSpaceOnUse">
+      <rect width="36" height="36" fill="#7A1D2C"/>
+      <g fill="none" stroke="#F4EEDD" stroke-width="1.6" opacity="0.9">
+        <circle cx="0" cy="0" r="8"/>
+        <circle cx="36" cy="0" r="8"/>
+        <circle cx="0" cy="36" r="8"/>
+        <circle cx="36" cy="36" r="8"/>
+      </g>
+      <g fill="#F4EEDD" opacity="0.92">
+        <path d="M18 6.5C21.5 11 21.5 14 18 18 14.5 14 14.5 11 18 6.5Z"/>
+        <path d="M18 6.5C21.5 11 21.5 14 18 18 14.5 14 14.5 11 18 6.5Z" transform="rotate(90 18 18)"/>
+        <path d="M18 6.5C21.5 11 21.5 14 18 18 14.5 14 14.5 11 18 6.5Z" transform="rotate(180 18 18)"/>
+        <path d="M18 6.5C21.5 11 21.5 14 18 18 14.5 14 14.5 11 18 6.5Z" transform="rotate(270 18 18)"/>
+      </g>
+      <circle cx="18" cy="18" r="2.4" fill="#E9B949"/>
+    </pattern>
+  </defs>
+  <rect x="0.5" y="0.5" width="239" height="335" rx="12" fill="#F4EEDD" stroke="#5A1420" stroke-width="1"/>
+  <rect x="10" y="10" width="220" height="316" rx="6" fill="url(#azulejo)"/>
+  <rect x="10" y="10" width="220" height="316" rx="6" fill="none" stroke="#5A1420" stroke-width="2"/>
+  <g transform="translate(120 168)">
+    <rect x="-27" y="-27" width="54" height="54" fill="#F4EEDD"/>
+    <rect x="-27" y="-27" width="54" height="54" fill="#F4EEDD" transform="rotate(45)"/>
+    <rect x="-21" y="-21" width="42" height="42" fill="#7A1D2C"/>
+    <rect x="-21" y="-21" width="42" height="42" fill="#7A1D2C" transform="rotate(45)"/>
+    <circle r="12" fill="#F4EEDD"/>
+    <circle r="5" fill="#E9B949"/>
+  </g>
+</svg>

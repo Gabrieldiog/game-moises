@@ -1,0 +1,185 @@
+/* --- action bar ------------------------------------------------------------ */
+
+.actionbar {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px var(--gutter);
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, var(--mesa-borda) 70%, rgb(5 25 26 / 0));
+}
+
+.actionbar__row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.actionbar__row > .btn {
+  flex: 1 1 0;
+}
+
+.actionbar__row > .btn--primary {
+  flex-grow: 1.6;
+}
+
+.actionbar__prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding-left: 4px;
+  font-weight: 700;
+  color: var(--lambe-amarelo);
+}
+
+/* --- shouts: lambe-lambe posters ------------------------------------------------ */
+
+.shouts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  width: 100%;
+}
+
+.shout {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  min-height: 72px;
+  min-width: var(--touch);
+  padding: 8px 12px;
+  border: 3px solid var(--tinta);
+  border-radius: var(--radius-poster);
+  color: var(--tinta);
+  box-shadow: var(--poster-shadow);
+  text-align: left;
+  transition: transform 90ms ease-out;
+}
+
+.shout__text {
+  font-family: var(--font-display);
+  font-size: clamp(18px, 5.2vw, 26px);
+  line-height: 1;
+  letter-spacing: 0.005em;
+}
+
+.shout__hint {
+  font-size: 11.5px;
+  font-weight: 650;
+  font-stretch: 88%;
+  line-height: 1.2;
+}
+
+.shout--own {
+  background: var(--lambe-amarelo);
+  transform: rotate(-1.4deg);
+}
+
+.shout--opp {
+  background: var(--lambe-rosa);
+  transform: rotate(1.2deg);
+}
+
+.shout--end {
+  background: var(--lambe-laranja);
+  transform: rotate(-4deg);
+  min-height: 60px;
+  max-width: 132px;
+  padding: 8px 10px;
+}
+
+.shout--end .shout__text {
+  font-size: clamp(16px, 4.4vw, 22px);
+}
+
+.shout:active:not(:disabled) {
+  box-shadow: 1px 1px 0 var(--tinta);
+  translate: 3px 3px;
+}
+
+.shout.is-armed {
+  outline: 3px dashed var(--papel);
+  outline-offset: 4px;
+}
+
+.shout:disabled {
+  filter: grayscale(0.85);
+  opacity: 0.5;
+  box-shadow: 2px 2px 0 var(--tinta);
+}
+
+/* the reaction window gets the whole bar */
+.actionbar--reaction {
+  padding-top: 14px;
+}
+
+/* on narrow phones the side sticker keeps only its words */
+@media (max-width: 480px) {
+  .shout--end .shout__hint {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* --- "Estou foda" confirmation ---------------------------------------------- */
+
+.confirm {
+  position: fixed;
+  z-index: 25;
+  left: 50%;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(calc(100vw - 2 * var(--gutter)), 460px);
+  padding: 16px;
+  background: var(--papel);
+  color: var(--tinta);
+  border: 3px solid var(--tinta);
+  border-radius: var(--radius-poster);
+  box-shadow: 6px 6px 0 var(--tinta);
+}
+
+.confirm__title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.confirm__hint {
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+.confirm__row {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.confirm .btn--ghost {
+  color: var(--tinta);
+  border-color: var(--tinta);
+}
+
+.shout--confirm {
+  max-width: none;
+  min-height: 56px;
+  align-items: center;
+  transform: rotate(-1.5deg);
+}

@@ -1,0 +1,185 @@
+/* --- one card ------------------------------------------------------------- */
+
+.card {
+  --w: var(--card-you);
+  position: relative;
+  display: block;
+  width: var(--w);
+  aspect-ratio: 5 / 7;
+  padding: 0;
+  border: 0;
+  border-radius: calc(var(--w) * 0.06);
+  background: none;
+  flex: none;
+  transition:
+    transform 140ms ease-out,
+    box-shadow 140ms ease-out;
+}
+
+.card--you {
+  --w: var(--card-you);
+}
+.card--opp {
+  --w: var(--card-opp);
+}
+.card--pile {
+  --w: var(--card-pile);
+}
+.card--hand {
+  --w: var(--card-hand);
+}
+.card--end {
+  --w: var(--card-end);
+}
+
+.card__img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.card--hidden,
+.card--visible {
+  box-shadow: 0 2px 0 rgb(0 0 0 / 0.35);
+}
+
+.card--empty {
+  background: rgb(0 0 0 / 0.16);
+  box-shadow: inset 0 0 0 2px rgb(244 238 221 / 0.22);
+  border-radius: calc(var(--w) * 0.08);
+}
+
+/* tappable: a quiet paper ring; chosen: lifted with the yellow poster ring */
+.card.is-selectable {
+  cursor: pointer;
+  box-shadow:
+    0 0 0 2px rgb(244 238 221 / 0.55),
+    0 2px 0 rgb(0 0 0 / 0.35);
+}
+
+.card.is-selectable:hover {
+  transform: translateY(-2px);
+}
+
+.card.is-selected {
+  transform: translateY(-4px);
+  box-shadow:
+    0 0 0 3px var(--lambe-amarelo),
+    0 0 0 6px var(--tinta),
+    0 8px 14px rgb(0 0 0 / 0.45);
+}
+
+.card--opp.is-selected {
+  transform: translateY(-2px);
+}
+
+/* seen for a short time (power peek, wrong reaction, initial peek) */
+.card.is-timed {
+  box-shadow:
+    0 0 0 2px var(--lambe-amarelo),
+    0 0 16px rgb(255 225 74 / 0.5);
+}
+
+.card.is-timed.is-selected {
+  box-shadow:
+    0 0 0 3px var(--lambe-amarelo),
+    0 0 0 6px var(--tinta),
+    0 0 18px rgb(255 225 74 / 0.6);
+}
+
+/* the discarded card that opened the reaction window */
+.card--reaction {
+  box-shadow:
+    0 0 0 3px var(--lambe-rosa),
+    0 0 22px rgb(255 92 168 / 0.55);
+  animation: reaction-pulse 900ms ease-in-out infinite alternate;
+}
+
+@keyframes reaction-pulse {
+  from {
+    transform: rotate(-2deg) scale(1);
+  }
+  to {
+    transform: rotate(2deg) scale(1.05);
+  }
+}
+
+/* Kings: a folded corner in the suit color, so red K (♥ ♦) and black K (♠ ♣)
+   read apart at a glance, even on the small opponent cards. */
+.card__kfold {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 42%;
+  aspect-ratio: 1;
+  border-top-right-radius: calc(var(--w) * 0.06);
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+  pointer-events: none;
+}
+
+.card--king-red .card__kfold {
+  background: var(--k-vermelho);
+}
+
+.card--king-black .card__kfold {
+  background: var(--k-preto);
+}
+
+.card__kfold-suit {
+  position: absolute;
+  top: 6%;
+  right: 9%;
+  color: #fff;
+  font-size: calc(var(--w) * 0.17);
+  line-height: 1;
+  font-family: system-ui, sans-serif;
+}
+
+.card--king-red {
+  box-shadow:
+    0 0 0 2px var(--k-vermelho),
+    0 2px 0 rgb(0 0 0 / 0.35);
+}
+
+/* --- grids ---------------------------------------------------------------- */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  justify-content: center;
+  gap: 6px;
+}
+
+.grid--you {
+  gap: clamp(6px, 1.2svh, 12px) clamp(8px, 2.4vw, 14px);
+}
+
+.grid--opp {
+  gap: 4px;
+}
+
+.grid__cell {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.grid__num {
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--mesa-funda);
+  color: var(--texto-suave);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 20px;
+  text-align: center;
+  pointer-events: none;
+}
