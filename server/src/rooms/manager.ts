@@ -698,6 +698,7 @@ export class RoomManager {
         turnMs: room.table.turnMs,
       },
       table: this.tableView(room),
+      availablePowers: this.basePowerRanks(),
       queue: this.queue(room).map((m) => ({ id: m.id, name: m.name, connected: m.socketId !== null })),
     };
   }

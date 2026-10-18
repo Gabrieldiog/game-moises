@@ -92,6 +92,7 @@ describe('room:setTable (manager)', () => {
       powers: ['7', '8', '9', '10', 'J', 'Q', 'K'],
     });
     expect(host.room.queue).toEqual([]);
+    expect(host.room.availablePowers).toEqual(['7', '8', '9', '10', 'J', 'Q', 'K']);
   });
 
   it('only the host can set it', () => {
@@ -107,6 +108,7 @@ describe('room:setTable (manager)', () => {
     const view = transport.last('s2', 'room:state');
     expect(view?.table).toEqual({ turnSeconds: 20, reactions: { matchOwn: true, matchOpponent: false }, powers: ['7', 'J'] });
     expect(view?.settings.turnMs).toBe(20_000);
+    expect(view?.availablePowers).toEqual(['7', '8', '9', '10', 'J', 'Q', 'K']); // unchanged by turning powers off
     data(rooms.start('s1'));
     const rules = rooms.inspect('ROOM00')?.session?.internalState.rules;
     expect(rules?.timings.turnMs).toBe(20_000);
