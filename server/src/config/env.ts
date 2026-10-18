@@ -23,6 +23,12 @@ export interface RateLimitConfig {
   readonly disconnectAfter: number;
 }
 
+export interface JoinFailureConfig {
+  /** Wrong room codes one address may try inside the window before joining is refused. */
+  readonly max: number;
+  readonly windowMs: number;
+}
+
 export interface ServerConfig {
   readonly nodeEnv: NodeEnv;
   readonly host: string;
@@ -42,6 +48,8 @@ export interface ServerConfig {
     /** Rooms that may exist at once created from the same address. */
     readonly maxRoomsPerIp: number;
     readonly rateLimit: RateLimitConfig;
+    /** Per address: limits guessing room codes (see FailureLimiter). */
+    readonly joinFailures: JoinFailureConfig;
   };
   readonly rooms: {
     readonly codeLength: number;
@@ -76,6 +84,8 @@ export const SERVER_ENV_VARS = [
   'RATE_LIMIT_BURST',
   'RATE_LIMIT_PER_SECOND',
   'RATE_LIMIT_DISCONNECT_AFTER',
+  'JOIN_FAIL_MAX',
+  'JOIN_FAIL_WINDOW_MS',
   'ROOM_CODE_LENGTH',
   'ROOM_IDLE_TTL_MS',
   'ROOM_EMPTY_TTL_MS',
@@ -162,6 +172,8 @@ const EnvSchema = z
     RATE_LIMIT_BURST: wholeNumber(20, 1, 10_000),
     RATE_LIMIT_PER_SECOND: wholeNumber(10, 1, 10_000),
     RATE_LIMIT_DISCONNECT_AFTER: wholeNumber(50, 1, 1_000_000),
+    JOIN_FAIL_MAX: wholeNumber(20, 1, 10_000),
+    JOIN_FAIL_WINDOW_MS: wholeNumber(5 * MINUTE, 1_000, DAY),
     ROOM_CODE_LENGTH: wholeNumber(6, ROOM_CODE_LIMITS.minLength, ROOM_CODE_LIMITS.maxLength),
     ROOM_IDLE_TTL_MS: wholeNumber(30 * MINUTE, 1_000, DAY),
     ROOM_EMPTY_TTL_MS: wholeNumber(2 * MINUTE, 1_000, DAY),
@@ -210,6 +222,7 @@ export function loadServerConfig(env: Env = process.env): ServerConfig {
         perSecond: e.RATE_LIMIT_PER_SECOND,
         disconnectAfter: e.RATE_LIMIT_DISCONNECT_AFTER,
       },
+      joinFailures: { max: e.JOIN_FAIL_MAX, windowMs: e.JOIN_FAIL_WINDOW_MS },
     },
     rooms: {
       codeLength: e.ROOM_CODE_LENGTH,

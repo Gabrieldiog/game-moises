@@ -12,6 +12,7 @@ describe('loadServerConfig', () => {
     expect(config.trustProxyHops).toBe(0);
     expect(config.limits.maxMessageBytes).toBe(16_384);
     expect(config.rooms.codeLength).toBe(6);
+    expect(config.limits.joinFailures).toEqual({ max: 20, windowMs: 300_000 });
     expect(config.bots.minDelayMs).toBeLessThanOrEqual(config.bots.maxDelayMs);
     expect(Object.isFrozen(config.limits.rateLimit)).toBe(true);
   });
@@ -32,6 +33,8 @@ describe('loadServerConfig', () => {
       RATE_LIMIT_BURST: '5',
       RATE_LIMIT_PER_SECOND: '2',
       RATE_LIMIT_DISCONNECT_AFTER: '7',
+      JOIN_FAIL_MAX: '4',
+      JOIN_FAIL_WINDOW_MS: '90000',
       ROOM_CODE_LENGTH: '8',
       ROOM_IDLE_TTL_MS: '60000',
       ROOM_EMPTY_TTL_MS: '30000',
@@ -54,6 +57,7 @@ describe('loadServerConfig', () => {
         maxRooms: 10,
         maxRoomsPerIp: 2,
         rateLimit: { burst: 5, perSecond: 2, disconnectAfter: 7 },
+        joinFailures: { max: 4, windowMs: 90000 },
       },
       rooms: { codeLength: 8, idleTtlMs: 60000, emptyTtlMs: 30000, lobbyReconnectGraceMs: 20000, sweepIntervalMs: 1000 },
       bots: { minDelayMs: 100, maxDelayMs: 200 },
@@ -82,6 +86,8 @@ describe('loadServerConfig', () => {
     ['PORT', '-1'],
     ['PORT', '80.5'],
     ['MAX_ROOMS', '0'],
+    ['JOIN_FAIL_MAX', '0'],
+    ['JOIN_FAIL_WINDOW_MS', '999'],
     ['ROOM_CODE_LENGTH', '3'],
     ['ROOM_CODE_LENGTH', '13'],
     ['MAX_MESSAGE_BYTES', '77'],

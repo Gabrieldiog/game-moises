@@ -14,6 +14,7 @@ export function testConfig(patch: DeepPartial<ServerConfig> = {}): ServerConfig 
       ...base.limits,
       ...(patch.limits as Partial<ServerConfig['limits']>),
       rateLimit: { ...base.limits.rateLimit, ...patch.limits?.rateLimit },
+      joinFailures: { ...base.limits.joinFailures, ...patch.limits?.joinFailures },
     },
     rooms: { ...base.rooms, ...patch.rooms },
     bots: { ...base.bots, ...patch.bots },

@@ -21,7 +21,7 @@ import { isOriginAllowed, type ServerConfig } from '../config/env.js';
 import type { RulesConfig } from '../config/rules.js';
 import { RoomManager, type Outcome, type RoomManagerDeps } from '../rooms/manager.js';
 import { silentLogger, type Logger } from '../util/log.js';
-import { TokenBucket } from './rate-limit.js';
+import { FailureLimiter, TokenBucket } from './rate-limit.js';
 
 // HTTP (GET /health) and Socket.IO on the same port. This layer only does
 // transport concerns: origin check, connection limits, message size, rate
@@ -77,7 +77,27 @@ export function clientIp(remote: string | undefined, forwardedFor: string | stri
     const candidate = list[list.length - trustProxyHops];
     if (candidate !== undefined && candidate.length <= 64) ip = candidate;
   }
-  return ip.startsWith('::ffff:') ? ip.slice('::ffff:'.length) : ip;
+  return ipv6Prefix(ip.startsWith('::ffff:') ? ip.slice('::ffff:'.length) : ip);
+}
+
+/**
+ * Per-address limits key an IPv6 client by its /64 prefix: one subscriber (or
+ * one cloud VM) usually owns a whole /64 and can rotate through 2^64
+ * addresses, which would defeat every limit keyed by the full address.
+ * IPv4 and anything that does not parse are returned unchanged.
+ */
+function ipv6Prefix(ip: string): string {
+  const address = ip.split('%')[0] ?? ip; // drop a zone id (fe80::1%eth0)
+  if (!address.includes(':')) return ip;
+  const [head = '', tail = ''] = address.split('::');
+  const headGroups = head === '' ? [] : head.split(':');
+  const tailGroups = tail === '' ? [] : tail.split(':');
+  const groups = address.includes('::')
+    ? [...headGroups, ...Array<string>(Math.max(0, 8 - headGroups.length - tailGroups.length)).fill('0'), ...tailGroups]
+    : headGroups;
+  const prefix = groups.slice(0, 4);
+  if (prefix.length < 4 || !prefix.every((group) => /^[0-9a-f]{1,4}$/i.test(group))) return ip;
+  return `${prefix.map((group) => parseInt(group, 16).toString(16)).join(':')}::/64`;
 }
 
 function sendJson(req: IncomingMessage, res: ServerResponse, status: number, body: unknown): void {
@@ -148,6 +168,26 @@ export function createGameServer(options: GameServerOptions): GameServer {
   // --- connection limits ---------------------------------------------------------
   let connections = 0;
   const connectionsByIp = new Map<string, number>();
+  const joinFailures = new FailureLimiter(config.limits.joinFailures.max, config.limits.joinFailures.windowMs);
+
+  // A raw WebSocket that never sends the Socket.IO CONNECT packet never reaches
+  // io.use below, so it is not counted there and each one holds a socket until
+  // the connect timeout (45 s). Cap what one address can hold at the engine
+  // level too, with headroom above maxConnectionsPerIp so clients that do
+  // connect still get the clearer TOO_MANY_CONNECTIONS reply.
+  const engineSocketsByIp = new Map<string, number>();
+  const engineSocketsPerIp = config.limits.maxConnectionsPerIp * 2;
+  io.engine.on('connection', (raw) => {
+    const ip = clientIp(raw.request.socket.remoteAddress, raw.request.headers['x-forwarded-for'], config.trustProxyHops);
+    const open = (engineSocketsByIp.get(ip) ?? 0) + 1;
+    engineSocketsByIp.set(ip, open);
+    raw.once('close', () => {
+      const left = (engineSocketsByIp.get(ip) ?? 1) - 1;
+      if (left <= 0) engineSocketsByIp.delete(ip);
+      else engineSocketsByIp.set(ip, left);
+    });
+    if (open > engineSocketsPerIp) raw.close();
+  });
 
   io.use((socket, next) => {
     const ip = clientIp(socket.handshake.address, socket.handshake.headers['x-forwarded-for'], config.trustProxyHops);
@@ -210,7 +250,13 @@ export function createGameServer(options: GameServerOptions): GameServer {
     };
 
     on('room:create', CreateRoomPayloadSchema, (p) => rooms.createRoom(socket.id, ip, p.name));
-    on('room:join', JoinRoomPayloadSchema, (p) => rooms.joinRoom(socket.id, p.code, p.name));
+    on('room:join', JoinRoomPayloadSchema, (p) => {
+      // Guessing codes: once an address used up its wrong codes, every join is refused alike, right code or not.
+      if (!joinFailures.allowed(ip, now())) return { ok: false, code: 'RATE_LIMITED' };
+      const outcome = rooms.joinRoom(socket.id, p.code, p.name);
+      if (!outcome.ok && outcome.code === 'ROOM_NOT_FOUND') joinFailures.fail(ip, now());
+      return outcome;
+    });
     on('room:quickPlay', QuickPlayPayloadSchema, (p) => rooms.quickPlay(socket.id, ip, p.name, p.bots));
     on('session:resume', ResumeSessionPayloadSchema, (p) => rooms.resume(socket.id, p.token));
     on('room:leave', EmptyPayloadSchema, () => rooms.leave(socket.id));
@@ -247,6 +293,7 @@ export function createGameServer(options: GameServerOptions): GameServer {
           sweeper = setInterval(() => {
             try {
               rooms.sweep();
+              joinFailures.prune(now());
             } catch (error) {
               logger.error('sweep failed', { error });
             }

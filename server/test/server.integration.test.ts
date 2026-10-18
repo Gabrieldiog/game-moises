@@ -321,6 +321,49 @@ describe('transport safety', () => {
     await expect(connect(url)).resolves.toBeTruthy();
   });
 
+  it('stops an address from guessing room codes, even with new connections, and recovers after the window', async () => {
+    const { url } = await startServer({ limits: { joinFailures: { max: 3, windowMs: 400 } } });
+    const host = await connect(url);
+    const code = ok(await host.emitWithAck('room:create', { name: 'Ana' })).room.code;
+    const guesser = await connect(url);
+    for (let i = 0; i < 3; i++) {
+      expect(errorCode(await guesser.emitWithAck('room:join', { code: 'ZZZZZZ', name: 'Eve' }))).toBe('ROOM_NOT_FOUND');
+    }
+    expect(errorCode(await guesser.emitWithAck('room:join', { code: 'ZZZZZZ', name: 'Eve' }))).toBe('RATE_LIMITED');
+    // Same address, other connection: still locked, and the right code gets the same answer as a wrong one.
+    const fresh = await connect(url);
+    expect(errorCode(await fresh.emitWithAck('room:join', { code, name: 'Eve' }))).toBe('RATE_LIMITED');
+    expect(errorCode(await fresh.emitWithAck('room:join', { code: 'YYYYYY', name: 'Eve' }))).toBe('RATE_LIMITED');
+    await sleep(450);
+    ok(await fresh.emitWithAck('room:join', { code, name: 'Eve' }));
+  });
+
+  it('counts only wrong codes: joining a real room (or being refused for another reason) never locks anyone', async () => {
+    const { url } = await startServer({ limits: { joinFailures: { max: 2, windowMs: 60_000 } } });
+    const host = await connect(url);
+    const code = ok(await host.emitWithAck('room:create', { name: 'Ana' })).room.code;
+    for (let i = 0; i < 5; i++) {
+      const guest = await connect(url);
+      ok(await guest.emitWithAck('room:join', { code, name: `G${i}` })); // host + 5 guests = the 6 seats
+    }
+    const late = await connect(url);
+    expect(errorCode(await late.emitWithAck('room:join', { code, name: 'Late' }))).toBe('ROOM_FULL');
+    expect(errorCode(await late.emitWithAck('room:join', { code, name: 'Late' }))).toBe('ROOM_FULL');
+    expect(errorCode(await late.emitWithAck('room:join', { code, name: 'Late' }))).toBe('ROOM_FULL');
+    expect(errorCode(await late.emitWithAck('room:join', { code: 'ZZZZZZ', name: 'Late' }))).toBe('ROOM_NOT_FOUND');
+  });
+
+  it('caps sockets that never finish the Socket.IO handshake, per address', async () => {
+    const { url } = await startServer({ limits: { maxConnectionsPerIp: 2 } }); // engine-level cap: 4
+    const raw = Array.from({ length: 12 }, () => new WebSocket(`${url.replace('http', 'ws')}/socket.io/?EIO=4&transport=websocket`));
+    await sleep(500);
+    expect(raw.filter((socket) => socket.readyState === WebSocket.OPEN)).toHaveLength(4);
+    for (const socket of raw) socket.close();
+    await sleep(200);
+    // Once they are gone the address can connect again.
+    expect((await connect(url)).connected).toBe(true);
+  });
+
   it('limits rooms per address', async () => {
     const { url } = await startServer({ limits: { maxRoomsPerIp: 1 } });
     const a = await connect(url);
