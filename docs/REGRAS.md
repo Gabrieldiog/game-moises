@@ -77,3 +77,16 @@ Pontos que a descrição original não cobria. Todos ficam em `server/src/config
 - Poder sem alvo possível (ex.: inimigos sem cartas) é pulado automaticamente.
 - O descarte começa vazio.
 - **Timer de turno (v0.2):** o jogador da vez tem **30 s** (`turnMs`, configurável por `MOISES_TURN_MS`) para **cada decisão** do turno: comprar, ficar com a carta ou descartar, usar ou pular o poder. A janela de reação não conta (tem prazo próprio). Se o tempo acabar, o servidor joga o mínimo pelo resto daquele turno: compra se ainda não comprou, descarta a carta comprada e pula o poder. Vale também para jogadores desconectados. O motor continua sem timers; quem aplica o prazo é o servidor.
+
+## Decisões do dono do jogo (18/10) — a implementar
+1. A carta comprada **não** pode ir para uma posição vazia; posição vazia é vantagem (menos pontos).
+2. Ficar sem cartas **não** encerra o jogo sozinho: o jogador com 0 cartas pode falar "Estou foda" na vez dele, se quiser.
+3. Uma reação certa por descarte; depois dela ninguém mais reage até o próximo jogador (já é assim).
+4. Até **2 erros** de reação por jogador em cada descarte.
+5. K vermelho só vale −1; o poder é só do K preto. (Pendente: K vermelho e K preto contam como "mesmo número" nas reações?)
+6. Quem sai no meio da partida é substituído por um **bot**.
+7. Não entra ninguém no meio; quem chega fica na **fila** para a próxima partida.
+8. Nomes repetidos são permitidos.
+9. **Configurações da mesa** (anfitrião decide antes de iniciar): tempo por decisão (padrão **15 s**), reações "filha da putinha" e "filho da puta" ligadas ou não, e quais poderes valem.
+10. "Estou foda" **sem** confirmação.
+11. Visual: trocar a mesa por uma mesa 2D mais imersiva (pesquisar referências e assets).
