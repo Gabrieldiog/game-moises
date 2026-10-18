@@ -127,7 +127,7 @@ export function Table({ view, events = NO_EVENTS, eventsSeq = 0, clockOffset, on
   return (
     <main
       ref={rootRef}
-      className={cx('table', `table--${status.tone}`, (intent.policy.own > 0 || intent.policy.opponents > 0) && 'is-picking', ctx.kind === 'claim' && 'is-claiming', guideFor(view, ctx, intent.picks) !== null && 'is-guided')}
+      className={cx('table', `table--${status.tone}`, (intent.policy.own > 0 || intent.policy.opponents > 0) && 'is-picking', ctx.kind === 'claim' && 'is-claiming', guideFor(view, ctx, intent.picks) !== null && 'is-guided', endCall !== null && 'has-endcall')}
       data-opponents={opponents.length}
       data-sides={left.length + right.length > 0 ? 'yes' : 'no'}
     >

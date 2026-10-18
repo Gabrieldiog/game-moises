@@ -751,3 +751,37 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+@media (max-height: 760px) and (max-width: 899px) {
+  .shouts-wrap {
+    gap: 4px;
+  }
+
+  .shouts__why {
+    padding: 1px 8px;
+    font-size: 12px;
+  }
+
+  .shouts--quiet .shout {
+    min-height: var(--touch);
+    padding-block: 2px;
+  }
+}
+
+/* the "Estou foda" banner takes a row: the shouts drop their small print, your cards shrink a bit */
+.table.has-endcall .shout__hint {
+  display: none;
+}
+
+.table.has-endcall {
+  --card-you: clamp(48px, min(18vw, 11.4svh), 124px);
+}
+
+.table.has-endcall.is-guided {
+  --card-you: clamp(46px, min(15vw, 9.6svh), 124px);
+}
+
+.table.has-endcall.is-guided[data-opponents='4'],
+.table.has-endcall.is-guided[data-opponents='5'] {
+  --card-you: clamp(44px, min(12.4vw, 7.4svh), 124px);
+}

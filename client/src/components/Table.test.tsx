@@ -40,8 +40,9 @@ describe('Table', () => {
     expect(document.querySelectorAll('.seat')).toHaveLength(players - 1);
   });
 
-  it('never renders a face that the view did not send', () => {
-    for (const { id } of SCENARIOS) {
+  // One case per scene (same assertions as before): a single loop over every scene and size outgrew the 5 s test budget under the full suite.
+  it.each(SCENARIOS.map((s) => s.id))('never renders a face that the view did not send (%s)', (id) => {
+    {
       for (const players of DEMO_PLAYER_COUNTS) {
         const { view, unmount, container } = renderTable(id, players);
         // The final screen repeats every grid on the score tab.
