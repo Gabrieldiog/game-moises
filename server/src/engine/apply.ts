@@ -20,9 +20,9 @@ import {
   gameError,
   getPlayer,
   isValidTime,
-  opponentCardCount,
   openReactionWindow,
   othersAfter,
+  powerTargetCount,
   tickDraft,
   triggerEndIfOutOfCards,
 } from './internal.js';
@@ -221,7 +221,7 @@ function usePower(d: Draft, me: PlayerId, action: UsePowerAction): GameError | n
     case 'peekAndSwap':
       return peekThenOfferSwap(d, me, turn, [action.target]);
     case 'peekManyAndSwap': {
-      const required = Math.min(s.rules.powers.peekManyCount, opponentCardCount(s, me));
+      const required = powerTargetCount(s, action.power, me);
       if (action.targets.length !== required) {
         return gameError('WRONG_TARGET_COUNT', `choose exactly ${required} opponent card(s)`);
       }

@@ -62,6 +62,25 @@ export function powerIsUsable(s: GameState, power: PowerKind, playerId: PlayerId
   }
 }
 
+/**
+ * How many targets `usePower` must name for `power` right now. Single source of
+ * truth: `applyAction` checks the action against it (WRONG_TARGET_COUNT) and
+ * `viewFor` publishes it as `TurnView.powerTargetCount`.
+ * peekManyAndSwap asks for `peekManyCount` opponent cards, limited to what is
+ * on the table; every other power takes exactly one pick.
+ */
+export function powerTargetCount(s: GameState, power: PowerKind, playerId: PlayerId): number {
+  switch (power) {
+    case 'peekManyAndSwap':
+      return Math.min(s.rules.powers.peekManyCount, opponentCardCount(s, playerId));
+    case 'peekOwn':
+    case 'peekOpponent':
+    case 'blindSwap':
+    case 'peekAndSwap':
+      return 1;
+  }
+}
+
 // --- piles -------------------------------------------------------------------
 
 /**

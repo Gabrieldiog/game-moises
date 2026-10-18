@@ -36,6 +36,15 @@ export interface TurnView {
   readonly drawnCard: Card | null;
   /** Public: the discarded card is face up, so its power is known to everyone. */
   readonly pendingPower: PowerKind | null;
+  /**
+   * How many cards the player must pick in the `usePower` of `pendingPower`:
+   * the length of `targets` for peekManyAndSwap (the server rule, limited to
+   * the opponent cards still on the table), 1 for the single-pick powers; null
+   * when there is no pending power. Public (derived from public card counts).
+   * It is only final at step 'power': during the reaction window the table can
+   * still change.
+   */
+  readonly powerTargetCount: number | null;
   /** Public: which positions were looked at (never their faces). */
   readonly peeked: readonly SlotRef[];
 }
