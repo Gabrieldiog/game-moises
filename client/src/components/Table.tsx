@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
-import type { Action, GameView, PlayerView, RoomView } from '@moises/shared';
+import { useMemo, useRef, type ReactNode } from 'react';
+import type { Action, GameView, PlayerView, RoomView, ServerGameEvent } from '@moises/shared';
+import { avatarLooks } from '../game/avatars';
 import { useServerNow } from '../game/clock';
 import { canPickOpponent, canPickOwn } from '../game/intent';
 import {
@@ -7,6 +8,7 @@ import {
   findMe,
   hasTimedCards,
   opponentsInSeatOrder,
+  playerName,
   sameRef,
   seatAreas,
   serverDeadlinePassed,
@@ -22,11 +24,15 @@ import { cx } from './cx';
 import { EndScreen } from './EndScreen';
 import { Piles } from './Piles';
 import { Seat } from './Seat';
+import { useTableFx } from './useTableFx';
 import { YouArea } from './YouArea';
 
 export interface TableProps {
   readonly view: GameView;
   /** view.now - Date.now() when the view arrived. */
+  /** Public events of the last update and a counter that changes with each update (animations only). */
+  readonly events?: readonly ServerGameEvent[];
+  readonly eventsSeq?: number;
   readonly clockOffset: number;
   readonly onSend: (action: Action) => void;
   readonly onLeave: () => void;
@@ -40,7 +46,9 @@ export interface TableProps {
   readonly statusExtra?: ReactNode;
 }
 
-export function Table({ view, clockOffset, onSend, onLeave, turnDeadline = null, room = null, onBackToRoom, statusExtra }: TableProps) {
+const NO_EVENTS: readonly ServerGameEvent[] = [];
+
+export function Table({ view, events = NO_EVENTS, eventsSeq = 0, clockOffset, onSend, onLeave, turnDeadline = null, room = null, onBackToRoom, statusExtra }: TableProps) {
   const countdown = activeCountdown(view, turnDeadline);
   // Tick only while something on screen depends on the clock.
   const probe = Date.now() + clockOffset;
@@ -50,6 +58,9 @@ export function Table({ view, clockOffset, onSend, onLeave, turnDeadline = null,
   const ctx = uiContext(view, now);
   const intent = useIntent(view, ctx, onSend);
   const me = findMe(view);
+  const rootRef = useRef<HTMLElement | null>(null);
+  const stamp = useTableFx(rootRef, events, eventsSeq, view.you);
+  const looks = useMemo(() => avatarLooks(view.players.map((p) => p.id)), [view.players]);
   const opponents = opponentsInSeatOrder(view);
   const areas = seatAreas(opponents.length);
   const status = statusLines(view, ctx, intent.picks);
@@ -57,7 +68,6 @@ export function Table({ view, clockOffset, onSend, onLeave, turnDeadline = null,
 
   const bots = new Set(room?.members.filter((m) => m.isBot).map((m) => m.id) ?? []);
   const queued = room !== null && room.queue.some((q) => q.id === room.you);
-  const seatIndex = (id: string) => view.players.findIndex((p) => p.id === id);
 
   const seatsIn = (area: SeatArea) =>
     opponents.flatMap((player, i) => (areas[i] === area ? [renderSeat(player, area)] : []));
@@ -70,7 +80,7 @@ export function Table({ view, clockOffset, onSend, onLeave, turnDeadline = null,
         player={player}
         now={now}
         area={area}
-        seatIndex={seatIndex(player.id)}
+        look={looks.get(player.id)}
         isBot={bots.has(player.id)}
         isSelectable={(slot) => canPickOpponent(intent.policy, player, slot)}
         isSelected={(slot) => intent.picks.opponents.some((ref) => sameRef(ref, { playerId: player.id, slot }))}
@@ -84,6 +94,7 @@ export function Table({ view, clockOffset, onSend, onLeave, turnDeadline = null,
 
   return (
     <main
+      ref={rootRef}
       className={cx('table', `table--${status.tone}`, (intent.policy.own > 0 || intent.policy.opponents > 0) && 'is-picking')}
       data-opponents={opponents.length}
       data-sides={left.length + right.length > 0 ? 'yes' : 'no'}
@@ -135,10 +146,17 @@ export function Table({ view, clockOffset, onSend, onLeave, turnDeadline = null,
                 isSelectable={(slot) => canPickOwn(intent.policy, me, slot)}
                 isSelected={(slot) => intent.picks.own.includes(slot)}
                 onSelect={intent.pickOwn}
+                look={looks.get(me.id)}
                 beside={<CallEndButton view={view} ctx={ctx} onSend={intent.dispatch} />}
               />
             ) : (
               <p className="felt__spectator">{T.spectating}</p>
+            )}
+            {stamp && (
+              <div key={stamp.id} className={cx('stamp', stamp.ok ? 'stamp--ok' : 'stamp--miss')} role="status">
+                <span className="stamp__text">{stamp.ok ? (stamp.reaction === 'matchOwn' ? T.shoutOwn : T.shoutOpponent) : T.stampMiss}</span>
+                <span className="stamp__who">{playerName(view, stamp.playerId)}</span>
+              </div>
             )}
           </div>
         </div>
@@ -151,6 +169,7 @@ export function Table({ view, clockOffset, onSend, onLeave, turnDeadline = null,
         onSend={intent.dispatch}
         onShout={intent.pressShout}
         onCancel={intent.cancel}
+        attempts={view.reactionWindow ? { left: view.reactionWindow.yourAttemptsLeft, total: view.reactionWindow.attemptsPerPlayer } : null}
         {...(room ? { reactions: room.table.reactions } : {})}
       />
 

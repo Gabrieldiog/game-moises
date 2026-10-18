@@ -2,7 +2,6 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { SetTableSettingsPayload, TableSettingsView } from '@moises/shared';
-import { knownPowerRanks, type RankMemory } from '../game/powerRanks';
 import { TableSettings } from './TableSettings';
 
 const TABLE: TableSettingsView = {
@@ -41,15 +40,5 @@ describe('TableSettings', () => {
     expect(screen.getByText('Só o anfitrião muda as configurações.')).toBeInTheDocument();
     expect(screen.getByLabelText('J: desligada')).toBeInTheDocument();
     expect(screen.getByText('15 s')).toBeInTheDocument();
-  });
-});
-
-describe('knownPowerRanks', () => {
-  it('remembers ranks seen on for the room, so switching one off keeps its switch', () => {
-    let stored: { code: string; ranks: readonly string[] } | null = null;
-    const memory: RankMemory = { load: () => stored, save: (v) => void (stored = v) };
-    expect(knownPowerRanks('AAAA', ['7', 'K', 'Q'], memory)).toEqual(['7', 'Q', 'K']);
-    expect(knownPowerRanks('AAAA', ['K'], memory)).toEqual(['7', 'Q', 'K']);
-    expect(knownPowerRanks('BBBB', ['8'], memory)).toEqual(['8']);
   });
 });

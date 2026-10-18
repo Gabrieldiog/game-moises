@@ -155,6 +155,8 @@ export interface RoomView {
   readonly settings: RoomSettingsView;
   /** Current table settings (the next game uses them). */
   readonly table: TableSettingsView;
+  /** Every rank that has a power in the server rules, whether or not it is on at this table (`table.powers` is the subset on). */
+  readonly availablePowers: readonly Rank[];
   /** Waiting for the next game, in arrival order. They are not in `members` and see the game as spectators. */
   readonly queue: readonly QueuedMemberView[];
 }

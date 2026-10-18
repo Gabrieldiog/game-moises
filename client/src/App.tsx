@@ -35,7 +35,7 @@ export interface AppProps {
 
 export function App({ config, mock }: AppProps) {
   const store = useStore();
-  const { status, room, view, turnDeadline, clockOffset, knownSettings, notice, lastSent } = useConnectionState();
+  const { status, room, view, events, eventsSeq, turnDeadline, clockOffset, knownSettings, notice, lastSent } = useConnectionState();
   const [savedName] = useState(readSavedName);
 
   useEffect(() => {
@@ -74,6 +74,8 @@ export function App({ config, mock }: AppProps) {
       ) : view ? (
         <Table
           view={view}
+          events={events}
+          eventsSeq={eventsSeq}
           clockOffset={clockOffset}
           turnDeadline={turnDeadline}
           room={room}

@@ -192,3 +192,14 @@ describe('CallEndButton ("Estou foda")', () => {
     }
   });
 });
+
+describe('reaction attempts', () => {
+  it('shows how many attempts are left on each reaction button', () => {
+    const view = scene('reacao');
+    const ctx = uiContext(view, NOW);
+    render(
+      <ActionBar ctx={ctx} picks={NO_PICKS} shout={null} onSend={vi.fn()} onShout={vi.fn()} onCancel={vi.fn()} attempts={{ left: 1, total: 2 }} />,
+    );
+    expect(screen.getAllByText('Você tem mais 1 tentativa.')).toHaveLength(2);
+  });
+});

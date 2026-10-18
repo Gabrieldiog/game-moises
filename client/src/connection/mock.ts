@@ -258,6 +258,7 @@ export class MockConnection implements GameConnection {
         turnMs: this.table.turnSeconds * 1000,
       },
       table: this.table,
+      availablePowers: DEMO_SERVER.table.powers,
       queue: [],
     };
     this.emit({ type: 'room', room: this.room });

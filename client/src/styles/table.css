@@ -41,6 +41,7 @@
 
 /* the felt: grayscale weave tinted by --feltro, lamp pool, darker edges */
 .felt {
+  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -272,26 +273,48 @@
 }
 
 .avatar {
+  --av: var(--avatar-0);
   position: relative;
+  isolation: isolate;
   display: grid;
   place-items: center;
   flex: none;
   width: 24px;
   height: 24px;
-  border-radius: 50%;
-  background: var(--avatar-0);
-  color: var(--tinta);
+  color: #120e0b;
   font-family: var(--font-display);
   font-size: 13px;
   line-height: 1;
+}
+
+/* the colored silhouette is its own layer, so the bot antenna is not clipped with it */
+.avatar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 50%;
+  background: var(--av);
   box-shadow: inset 0 -2px 0 rgb(0 0 0 / 0.25);
 }
 
-.avatar--1 { background: var(--avatar-1); }
-.avatar--2 { background: var(--avatar-2); }
-.avatar--3 { background: var(--avatar-3); }
-.avatar--4 { background: var(--avatar-4); }
-.avatar--5 { background: var(--avatar-5); }
+.avatar--c0 { --av: var(--avatar-0); }
+.avatar--c1 { --av: var(--avatar-1); }
+.avatar--c2 { --av: var(--avatar-2); }
+.avatar--c3 { --av: var(--avatar-3); }
+.avatar--c4 { --av: var(--avatar-4); }
+.avatar--c5 { --av: var(--avatar-5); }
+.avatar--c6 { --av: var(--avatar-6); }
+.avatar--c7 { --av: var(--avatar-7); }
+.avatar--c8 { --av: var(--avatar-8); }
+.avatar--c9 { --av: var(--avatar-9); }
+.avatar--c10 { --av: var(--avatar-10); }
+.avatar--c11 { --av: var(--avatar-11); }
+
+/* four silhouettes, so two similar colors still read apart */
+.avatar--s1::before { border-radius: 30%; }
+.avatar--s2::before { border-radius: 0; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.avatar--s3::before { border-radius: 0; clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%); }
 
 /* bots wear a small antenna */
 .avatar__bot {
@@ -429,30 +452,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-bottom: 10px; /* room for the position numbers */
 }
 
-/* your plaque sits at the top left of your grid, taking no row of its own */
-.me__head {
-  position: absolute;
-  z-index: 1;
-  top: 0;
-  left: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  max-width: calc(50% - var(--card-you) - 8px);
-}
-
-@media (min-width: 900px) and (min-aspect-ratio: 5/4) {
-  .me__head {
-    left: auto;
-    right: calc(50% + var(--card-you) + 24px);
-    align-items: flex-end;
-  }
-}
-
+/* grid in the middle, your drawn card to its right; the left column keeps the grid centered */
 .me__table {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -461,12 +463,15 @@
   width: 100%;
 }
 
-.me__beside {
+/* under the grid: your plaque, status chips and the "Estou foda" sticker in one balanced row */
+.me__foot {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 12px;
-  min-width: 0;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  min-height: 44px;
+  margin-top: 10px; /* clears the position numbers */
 }
 
 .me__hand {
@@ -508,7 +513,7 @@
 /* a full table (5 opponents) gives your grid a little less room */
 .table[data-opponents='5'],
 .table[data-opponents='4'] {
-  --card-you: clamp(56px, min(19vw, 11.6svh), 124px);
+  --card-you: clamp(50px, min(15.8vw, 10.4svh), 124px);
 }
 
 /* --- wider screens ----------------------------------------------------------- */
@@ -544,7 +549,7 @@
 
 @media (max-height: 760px) and (max-width: 899px) {
   :root {
-    --card-you: clamp(60px, min(20vw, 12.6svh), 124px);
+    --card-you: clamp(54px, min(18.2vw, 11.4svh), 124px);
     --card-pile: clamp(48px, min(13.5vw, 8.6svh), 92px);
     --card-hand: clamp(54px, min(17vw, 10.6svh), 108px);
   }
@@ -573,6 +578,132 @@
   }
 
   .shout {
-    min-height: 64px;
+    min-height: 56px;
+  }
+
+  /* the poster words are enough on a short screen */
+  .shout:not(.shout--end) .shout__hint {
+    display: none;
+  }
+
+  .table[data-opponents='4'],
+  .table[data-opponents='5'] {
+    --card-you: clamp(46px, min(14.2vw, 8.8svh), 124px);
+    --card-pile: clamp(44px, min(12vw, 7.4svh), 92px);
+  }
+
+  .rail {
+    padding: 8px;
+  }
+
+  .felt {
+    padding-inline: 6px;
+  }
+
+  .me__foot {
+    margin-top: 8px;
+    min-height: 40px;
+  }
+
+  .endcall {
+    padding-block: 3px;
+  }
+}
+
+/* --- motion ------------------------------------------------------------------
+   Short (150-400 ms) and only decoration. Card movement itself is done with the
+   Web Animations API (components/fx.ts). */
+
+/* whose turn it is: the plaque pops in and its grid keeps a soft pulse */
+.seat.is-turn .seat__tag,
+.me.is-turn .me__tag {
+  animation: turn-in 320ms cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+
+.seat.is-turn .grid {
+  animation: turn-glow 1600ms ease-in-out infinite alternate;
+}
+
+@keyframes turn-in {
+  from {
+    transform: scale(0.85);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes turn-glow {
+  from {
+    box-shadow: 0 0 0 2px rgb(255 225 74 / 0.45);
+  }
+  to {
+    box-shadow: 0 0 0 2px rgb(255 225 74 / 0.9);
+  }
+}
+
+/* the reaction verdict, stamped on the middle of the felt */
+.stamp {
+  position: absolute;
+  z-index: 25;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  max-width: 92%;
+  padding: 6px 16px 8px;
+  border: 4px solid var(--tinta);
+  border-radius: var(--radius-poster);
+  color: var(--tinta);
+  box-shadow: var(--poster-shadow);
+  text-align: center;
+  pointer-events: none;
+  translate: -50% -50%;
+  rotate: -6deg;
+  animation: stamp-in 260ms cubic-bezier(0.2, 1.2, 0.4, 1) both;
+}
+
+.stamp--ok {
+  background: var(--lambe-amarelo);
+}
+
+.stamp--miss {
+  background: var(--papel);
+  rotate: 5deg;
+}
+
+.stamp__text {
+  font-family: var(--font-display);
+  font-size: clamp(22px, 7vw, 34px);
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.stamp__who {
+  font-size: 13px;
+  font-weight: 750;
+  font-stretch: 85%;
+}
+
+@keyframes stamp-in {
+  from {
+    opacity: 0;
+    scale: 1.7;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seat.is-turn .seat__tag,
+  .me.is-turn .me__tag,
+  .seat.is-turn .grid,
+  .stamp,
+  .card--reaction {
+    animation: none;
   }
 }

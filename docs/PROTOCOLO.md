@@ -115,6 +115,7 @@ Recusas do motor voltam com o código de `shared/src/errors.ts`: `NOT_YOUR_TURN`
   members: [{ id, name, isBot, isHost, connected }], // ordem dos lugares na próxima partida
   settings: { minPlayers, maxPlayers, turnMs },
   table: { turnSeconds, reactions: { matchOwn, matchOpponent }, powers: Rank[] }, // configurações da mesa (padrão 15 s, tudo ligado)
+  availablePowers: Rank[], // todas as cartas com poder nas regras do servidor (ligadas ou não na mesa), para religar qualquer uma
   queue: [{ id, name, connected }], // chegaram com a partida em andamento; viram jogadores na próxima (e assistem como espectadores)
 }
 ```

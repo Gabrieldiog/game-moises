@@ -17,6 +17,7 @@ const ROOM: RoomView = {
   members: [{ id: 'p1', name: 'Gi', isBot: false, isHost: true, connected: true }],
   settings: { minPlayers: 2, maxPlayers: 6, turnMs: 15_000 },
   table: { turnSeconds: 15, reactions: { matchOwn: true, matchOpponent: true }, powers: ['7', 'K'] },
+  availablePowers: ['7', '8', '9', '10', 'J', 'Q', 'K'],
   queue: [],
 };
 

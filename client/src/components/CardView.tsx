@@ -1,6 +1,8 @@
+import { useLayoutEffect, useRef } from 'react';
 import { cardColor, type Card, type Rank, type SlotView, type Suit } from '@moises/shared';
 import backUrl from '../assets/card-back.svg';
 import { cardName, SUIT_SYMBOLS, T } from '../i18n/pt-BR';
+import { flipCard } from './fx';
 import { cx } from './cx';
 
 export type CardSize = 'you' | 'opp' | 'pile' | 'hand' | 'end';
@@ -44,6 +46,8 @@ export interface CardViewProps {
   readonly onSelect?: () => void;
   /** Extra emphasis, e.g. the card that opened a reaction window. */
   readonly accent?: 'reaction' | null;
+  /** Name for animations (data-anchor): where this card is on the table. */
+  readonly anchor?: string;
   readonly className?: string;
 }
 
@@ -51,7 +55,19 @@ export interface CardViewProps {
  * One card. A hidden card renders only the generic back: no face, id or hint
  * of its value reaches the DOM or the accessibility tree.
  */
-export function CardView({ slot, size, label, selectable = false, selected = false, onSelect, accent = null, className }: CardViewProps) {
+export function CardView({ slot, size, label, selectable = false, selected = false, onSelect, accent = null, anchor, className }: CardViewProps) {
+  const ref = useRef<HTMLElement | null>(null);
+  const setRef = (el: HTMLElement | null) => {
+    ref.current = el;
+  };
+  const lastState = useRef(slot.state);
+  useLayoutEffect(() => {
+    const before = lastState.current;
+    lastState.current = slot.state;
+    // Turning over (revealed, or hidden again): a short flip. Cards appearing or leaving a position do not flip.
+    if (before !== slot.state && before !== 'empty' && slot.state !== 'empty' && size !== 'end' && ref.current) flipCard(ref.current);
+  }, [slot.state, size]);
+
   const description =
     slot.state === 'empty' ? T.emptySlot : slot.state === 'hidden' ? T.hiddenCard : cardName(slot.card);
   const ariaLabel = `${label}: ${description}`;
@@ -85,13 +101,13 @@ export function CardView({ slot, size, label, selectable = false, selected = fal
 
   if (selectable && onSelect) {
     return (
-      <button type="button" className={classes} aria-label={ariaLabel} aria-pressed={selected} onClick={onSelect}>
+      <button ref={setRef} type="button" className={classes} aria-label={ariaLabel} aria-pressed={selected} onClick={onSelect} {...(anchor ? { 'data-anchor': anchor } : {})}>
         {content}
       </button>
     );
   }
   return (
-    <div className={classes} role="img" aria-label={ariaLabel}>
+    <div ref={setRef} className={classes} role="img" aria-label={ariaLabel} {...(anchor ? { 'data-anchor': anchor } : {})}>
       {content}
     </div>
   );

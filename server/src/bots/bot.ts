@@ -101,7 +101,7 @@ export class Bot {
     if (!me) return null;
 
     const window = view.reactionWindow;
-    if (window && !window.attemptedBy.includes(this.id)) {
+    if (window && (window.yourAttemptsLeft ?? 0) > 0) {
       const reaction = this.chooseReaction(view, me, window);
       if (reaction) return reaction;
     }

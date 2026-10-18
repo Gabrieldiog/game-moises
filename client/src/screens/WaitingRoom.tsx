@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
+import type { Rank } from '@moises/shared';
 import { Avatar } from '../components/Avatar';
 import { cx } from '../components/cx';
 import type { GameConnection, RoomView } from '../connection/types';
-import { knownPowerRanks } from '../game/powerRanks';
+import { avatarLooks } from '../game/avatars';
 import { T } from '../i18n/pt-BR';
 import { TableSettings } from './TableSettings';
 
@@ -23,7 +24,9 @@ export function WaitingRoom({ connection, room }: WaitingRoomProps) {
   const { minPlayers, maxPlayers } = room.settings;
   const seated = room.members.length;
   const playing = room.status === 'playing';
-  const powerRanks = useMemo(() => knownPowerRanks(room.code, room.table.powers), [room.code, room.table.powers]);
+  const looks = useMemo(() => avatarLooks([...room.members.map((m) => m.id), ...room.queue.map((q) => q.id)]), [room.members, room.queue]);
+  // Every rank with a power in the server rules, on or off at this table.
+  const powerRanks: readonly Rank[] = room.availablePowers;
 
   const copy = async () => {
     try {
@@ -53,11 +56,11 @@ export function WaitingRoom({ connection, room }: WaitingRoomProps) {
           {T.seatsCount(seated, maxPlayers)}
         </h2>
         <ul className="seats">
-          {room.members.map((member, i) => {
+          {room.members.map((member) => {
             const isYou = member.id === room.you;
             return (
               <li key={member.id} className={cx('seats__item', isYou && 'is-you', !member.connected && 'is-offline')}>
-                <Avatar name={member.name} index={i} isBot={member.isBot} className="seats__avatar" />
+                <Avatar name={member.name} id={member.id} look={looks.get(member.id)} isBot={member.isBot} className="seats__avatar" />
                 <span className="seats__name">
                   {member.name}
                   {isYou && <span className="seats__meta"> ({T.you.toLowerCase()})</span>}
@@ -90,9 +93,9 @@ export function WaitingRoom({ connection, room }: WaitingRoomProps) {
           <div className="queue">
             <h3 className="queue__title">{T.queueTitle}</h3>
             <ul className="seats">
-              {room.queue.map((q, i) => (
+              {room.queue.map((q) => (
                 <li key={q.id} className={cx('seats__item', q.id === room.you && 'is-you', !q.connected && 'is-offline')}>
-                  <Avatar name={q.name} index={seated + i} className="seats__avatar" />
+                  <Avatar name={q.name} id={q.id} look={looks.get(q.id)} className="seats__avatar" />
                   <span className="seats__name">
                     {q.name}
                     {q.id === room.you && <span className="seats__meta"> ({T.you.toLowerCase()})</span>}

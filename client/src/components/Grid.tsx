@@ -15,11 +15,13 @@ export interface GridProps {
   readonly onSelect?: (slot: number) => void;
   /** Show 1-based position numbers under the cards (your own grid). */
   readonly numbered?: boolean;
+  /** Anchor prefix for animations: cell n is announced as `${prefix}${n}`. */
+  readonly anchorPrefix?: string;
   readonly className?: string;
 }
 
 /** A player's positions, two per row: [0][1] / [2][3] / ... Empty positions keep their place. */
-export function Grid({ player, now, size, label, slotLabel, isSelectable, isSelected, onSelect, numbered = false, className }: GridProps) {
+export function Grid({ player, now, size, label, slotLabel, isSelectable, isSelected, onSelect, numbered = false, anchorPrefix, className }: GridProps) {
   return (
     <div className={cx('grid', `grid--${size}`, className)} role="group" aria-label={label}>
       {player.slots.map((raw, slot) => {
@@ -31,6 +33,7 @@ export function Grid({ player, now, size, label, slotLabel, isSelectable, isSele
               slot={effectiveSlot(raw, now)}
               size={size}
               label={slotLabel(slot)}
+              {...(anchorPrefix ? { anchor: `${anchorPrefix}${slot}` } : {})}
               selectable={selectable}
               selected={isSelected?.(slot) ?? false}
               {...(selectable && onSelect ? { onSelect: () => onSelect(slot) } : {})}
