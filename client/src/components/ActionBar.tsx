@@ -18,6 +18,8 @@ export interface ActionBarProps {
   readonly onSend: (action: Action) => void;
   readonly onShout: (shout: Shout) => void;
   readonly onCancel: () => void;
+  /** Attempts in the open reaction window (ReactionWindowView): left for you (null = spectator) of the total each player gets. */
+  readonly attempts?: { readonly left: number | null; readonly total: number } | null;
   /** Reactions switched on at this table (RoomView.table); both on when unknown. */
   readonly reactions?: TableSettingsView['reactions'];
 }
@@ -42,11 +44,25 @@ function Btn({
   );
 }
 
+/** Attempts left in this reaction window, as filled/empty dots with the number for screen readers. */
+function Pips({ attempts }: { attempts: ActionBarProps['attempts'] }) {
+  if (!attempts || attempts.left === null || attempts.total <= 0) return null;
+  const total = Math.min(attempts.total, 6);
+  return (
+    <span className="shout__pips" title={T.attemptsLeft(attempts.left)}>
+      {Array.from({ length: total }, (_, i) => (
+        <span key={i} className={cx('pip', i < attempts.left! && 'is-on')} aria-hidden="true" />
+      ))}
+      <span className="sr-only">{T.attemptsLeft(attempts.left)}</span>
+    </span>
+  );
+}
+
 /**
  * Only what the current moment allows. Buttons build typed actions from the
  * selected cards; the server still validates every one of them.
  */
-export function ActionBar({ ctx, picks, shout, onSend, onShout, onCancel, reactions = ALL_REACTIONS }: ActionBarProps) {
+export function ActionBar({ ctx, picks, shout, onSend, onShout, onCancel, attempts = null, reactions = ALL_REACTIONS }: ActionBarProps) {
   let row: ReactNode = null;
   switch (ctx.kind) {
     case 'myDraw':
@@ -110,6 +126,7 @@ export function ActionBar({ ctx, picks, shout, onSend, onShout, onCancel, reacti
               >
                 <span className="shout__text">{T.shoutOwn}</span>
                 <span className="shout__hint">{T.shoutOwnHint}</span>
+                <Pips attempts={attempts} />
               </button>
             )}
             {reactions.matchOpponent && (
@@ -121,6 +138,7 @@ export function ActionBar({ ctx, picks, shout, onSend, onShout, onCancel, reacti
               >
                 <span className="shout__text">{T.shoutOpponent}</span>
                 <span className="shout__hint">{T.shoutOpponentHint}</span>
+                <Pips attempts={attempts} />
               </button>
             )}
           </div>
@@ -160,9 +178,9 @@ export interface CallEndButtonProps {
 export function CallEndButton({ view, onSend }: CallEndButtonProps) {
   if (!canOfferCallEnd(view)) return null;
   return (
-    <button type="button" className="shout shout--end" onClick={() => onSend({ type: 'callEnd' })}>
+    <button type="button" className="shout shout--end" title={T.callEndHint} onClick={() => onSend({ type: 'callEnd' })}>
       <span className="shout__text">{T.callEnd}</span>
-      <span className="shout__hint">{T.callEndHint}</span>
+      <span className="sr-only">{T.callEndHint}</span>
     </button>
   );
 }

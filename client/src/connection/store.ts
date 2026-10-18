@@ -1,4 +1,4 @@
-import type { Action, GameView, RoomClosedReason, RoomSettingsView } from '@moises/shared';
+import type { Action, GameView, RoomClosedReason, RoomSettingsView, ServerGameEvent } from '@moises/shared';
 import { clockOffset } from '../game/clock';
 import type { ConnectionError, ConnectionStatus, GameConnection, RoomView } from './types';
 
@@ -16,6 +16,9 @@ export interface ConnectionSnapshot {
   readonly status: ConnectionStatus;
   readonly room: RoomView | null;
   readonly view: GameView | null;
+  /** Public events of the last update, and a counter that grows with each update (drives animations only). */
+  readonly events: readonly ServerGameEvent[];
+  readonly eventsSeq: number;
   /** GameUpdate.turnDeadline of the last update (server clock). */
   readonly turnDeadline: number | null;
   /** view.now - Date.now() measured when the last update arrived. */
@@ -44,6 +47,8 @@ export class ConnectionStore {
       status: connection.getStatus(),
       room: null,
       view: null,
+      events: [],
+      eventsSeq: 0,
       turnDeadline: null,
       clockOffset: 0,
       knownSettings: null,
@@ -64,6 +69,8 @@ export class ConnectionStore {
         case 'update':
           this.set({
             view: event.update.view,
+            events: event.update.events,
+            eventsSeq: this.snapshot.eventsSeq + 1,
             turnDeadline: event.update.turnDeadline,
             clockOffset: clockOffset(event.update.view.now, this.localNow()),
           });

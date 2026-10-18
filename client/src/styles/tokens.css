@@ -29,13 +29,19 @@
   --tex-feltro: url('/textures/feltro.jpg');
   --tex-madeira: url('/textures/madeira.jpg');
 
-  /* avatar colors, by seat */
-  --avatar-0: #c9a227;
-  --avatar-1: #b5523b;
-  --avatar-2: #4f7cac;
-  --avatar-3: #8a5fa8;
-  --avatar-4: #3f8f72;
-  --avatar-5: #c46d8e;
+  /* avatar colors (12), picked from the player id; ink color chosen for contrast */
+  --avatar-0: #e0b43a;
+  --avatar-1: #d9694b;
+  --avatar-2: #5b8fc4;
+  --avatar-3: #a67bc7;
+  --avatar-4: #48a584;
+  --avatar-5: #d77fa1;
+  --avatar-6: #8fbf4a;
+  --avatar-7: #e58a3c;
+  --avatar-8: #4fb3c8;
+  --avatar-9: #c75a6e;
+  --avatar-10: #7d86d9;
+  --avatar-11: #c9c27a;
 
   /* table shape: oval radius as horizontal / vertical */
   --rail: clamp(10px, 2.8vw, 18px);
@@ -75,7 +81,7 @@
   --touch: 44px;
 
   /* card widths (height = width x 7/5). Opponent cards never go under the 44px touch target. */
-  --card-you: clamp(60px, min(21vw, 13svh), 124px);
+  --card-you: clamp(56px, min(19.5vw, 12.2svh), 124px);
   --card-opp: clamp(44px, min(11vw, 6.6svh), 60px);
   --card-pile: clamp(52px, min(15vw, 9.4svh), 92px);
   --card-hand: clamp(58px, min(19vw, 11.6svh), 108px);

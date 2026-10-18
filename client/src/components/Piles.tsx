@@ -38,11 +38,11 @@ export function Piles({ view, onDraw }: PilesProps) {
     <div className="piles">
       <div className="pile">
         {onDraw ? (
-          <button type="button" className="deck is-actionable" aria-label={`${deckLabel}. ${T.draw}`} onClick={onDraw}>
+          <button type="button" className="deck is-actionable" data-anchor="deck" aria-label={`${deckLabel}. ${T.draw}`} onClick={onDraw}>
             {stack}
           </button>
         ) : (
-          <div className="deck" role="img" aria-label={deckLabel}>
+          <div className="deck" data-anchor="deck" role="img" aria-label={deckLabel}>
             {stack}
           </div>
         )}
@@ -56,6 +56,7 @@ export function Piles({ view, onDraw }: PilesProps) {
           size="pile"
           label={top ? `${T.discard} (${T.discardCount(view.discardCount)})` : T.discardEmpty}
           accent={reactionCard ? 'reaction' : null}
+          anchor="discard"
         />
         <span className="pile__label" aria-hidden="true">
           {T.discard}

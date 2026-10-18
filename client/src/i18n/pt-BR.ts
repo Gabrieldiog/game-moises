@@ -93,8 +93,8 @@ export const POWER_TEXT: Record<PowerKind, { readonly name: string; readonly hin
     confirm: 'Espiar a carta',
   },
   peekManyAndSwap: {
-    name: 'Espiar inimigos e trocar',
-    hint: 'Toque nas cartas de inimigos que quer ver. Depois você decide se troca uma delas.',
+    name: 'Espiar inimigos',
+    hint: 'Toque nas cartas de inimigos que quer ver. Depois decida se troca.',
     confirm: 'Espiar as cartas',
   },
 };
@@ -220,9 +220,10 @@ export const T = {
   pickedOf: (picked: number, total: number) => `${picked}/${total}`,
   peekManyHint: (n: number) =>
     n === 1
-      ? 'Toque numa carta de um inimigo para ver. Depois você decide se troca.'
-      : `Toque em ${n} cartas de inimigos para ver. Depois você decide se troca uma delas.`,
+      ? 'Toque numa carta de um inimigo. Depois decida se troca.'
+      : `Toque em ${n} cartas de inimigos. Depois decida se troca.`,
   pickCards: (n: number) => (n === 0 ? 'Toque nas cartas' : `${n} ${n === 1 ? 'carta escolhida' : 'cartas escolhidas'}`),
+  stampMiss: 'Errou!',
   shoutOwn: 'Filha da putinha!',
   shoutOwnHint: 'Descarta uma carta sua igual.',
   shoutOwnPick: 'Toque na sua carta igual.',

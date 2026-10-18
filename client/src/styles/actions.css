@@ -7,8 +7,8 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px var(--gutter);
-  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  padding: 8px var(--gutter);
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
   background: linear-gradient(to top, var(--sala) 72%, rgb(18 14 11 / 0));
 }
 
@@ -63,9 +63,9 @@
   align-items: flex-start;
   justify-content: center;
   gap: 4px;
-  min-height: 66px;
+  min-height: 62px;
   min-width: var(--touch);
-  padding: 8px 12px;
+  padding: 6px 12px;
   border: 3px solid var(--tinta);
   border-radius: var(--radius-poster);
   color: var(--tinta);
@@ -100,14 +100,40 @@
 
 .shout--end {
   background: var(--lambe-laranja);
-  transform: rotate(-4deg);
-  min-height: 60px;
-  max-width: 132px;
-  padding: 8px 10px;
+  transform: rotate(-2deg);
+  flex-direction: row;
+  align-items: center;
+  min-height: var(--touch);
+  padding: 4px 14px;
+  border-width: 2.5px;
+  box-shadow: 3px 3px 0 var(--tinta);
 }
 
 .shout--end .shout__text {
-  font-size: clamp(16px, 4.4vw, 22px);
+  font-size: 19px;
+  white-space: nowrap;
+}
+
+/* attempts left in the reaction window */
+.shout__pips {
+  position: absolute;
+  top: 6px;
+  right: 7px;
+  display: flex;
+  gap: 4px;
+}
+
+.pip {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--tinta);
+  background: transparent;
+  transition: background-color 150ms;
+}
+
+.pip.is-on {
+  background: var(--tinta);
 }
 
 .shout:active:not(:disabled) {
@@ -128,18 +154,6 @@
 
 /* the reaction window gets the whole bar */
 .actionbar--reaction {
-  padding-top: 14px;
-}
-
-/* on narrow phones the side sticker keeps only its words */
-@media (max-width: 480px) {
-  .shout--end .shout__hint {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
+  padding-top: 10px;
 }
 
