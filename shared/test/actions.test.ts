@@ -115,3 +115,13 @@ describe('ActionSchema', () => {
     expect(() => parseAction(Object.create(null))).not.toThrow();
   });
 });
+
+describe('claimReaction', () => {
+  it('accepts both kinds and rejects anything else', () => {
+    expect(parseAction({ type: 'claimReaction', kind: 'matchOwn' }).ok).toBe(true);
+    expect(parseAction({ type: 'claimReaction', kind: 'matchOpponent' }).ok).toBe(true);
+    expect(parseAction({ type: 'claimReaction', kind: 'other' }).ok).toBe(false);
+    expect(parseAction({ type: 'claimReaction' }).ok).toBe(false);
+    expect(parseAction({ type: 'claimReaction', kind: 'matchOwn', slot: 1 }).ok).toBe(false);
+  });
+});

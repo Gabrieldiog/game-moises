@@ -173,7 +173,7 @@ describe('running out of cards does not end the game by itself', () => {
     keepOnlyFirstCard(game, 'p2');
     game.act('p1', { type: 'draw' }).act('p1', { type: 'discardDrawn' });
     game.act('p2', { type: 'matchOwn', slot: 0 });
-    expect(game.lastEvents.map((e) => e.type)).toEqual(['reactionSucceeded', 'reactionWindowClosed', 'turnStarted']);
+    expect(game.lastEvents.map((e) => e.type)).toEqual(['reactionSucceeded', 'reactionResolved', 'reactionWindowClosed', 'turnStarted']);
     expect(game.state.endCall).toBeNull();
     expect(game.grid('p2').every((slot) => slot === null)).toBe(true);
     // p2 still gets its turns; the game goes on

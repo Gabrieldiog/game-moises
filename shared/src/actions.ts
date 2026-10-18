@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PLAYER_ID_PATTERN, PROTOCOL_LIMITS } from './limits.js';
+import { REACTION_KINDS } from './game.js';
 import type { PowerKind } from './powers.js';
 
 // Everything a client may send. Actions never carry card values: only slot
@@ -117,6 +118,16 @@ export const MatchOpponentActionSchema = z.strictObject({
   giveSlot: SlotIndexSchema,
 });
 
+/**
+ * Claims the reaction window for yourself ("Filho da puta!" shout): the first valid
+ * claim locks the window for that player and extends its deadline, so they have time
+ * to pick the cards. Only the claimant may then send the matching `kind`.
+ */
+export const ClaimReactionActionSchema = z.strictObject({
+  type: z.literal('claimReaction'),
+  kind: z.enum(REACTION_KINDS),
+});
+
 export const ActionSchema = z.discriminatedUnion('type', [
   ArrangeActionSchema,
   DrawActionSchema,
@@ -128,6 +139,7 @@ export const ActionSchema = z.discriminatedUnion('type', [
   SkipPowerActionSchema,
   MatchOwnActionSchema,
   MatchOpponentActionSchema,
+  ClaimReactionActionSchema,
 ]);
 
 export type Action = z.infer<typeof ActionSchema>;

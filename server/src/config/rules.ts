@@ -63,6 +63,8 @@ export const RulesConfigSchema = z
       arrangeMs: DurationMsSchema,
       initialPeekMs: DurationMsSchema,
       reactionWindowMs: DurationMsSchema,
+      /** Time a player gets to pick the cards after claiming the reaction window (claimReaction). */
+      reactionClaimMs: DurationMsSchema,
       /** How long a seen card stays face up: power peeks, and the card revealed to all after a wrong reaction. */
       revealMs: DurationMsSchema,
       /**
@@ -154,6 +156,7 @@ export const DEFAULT_RULES: RulesConfig = deepFreeze({
     arrangeMs: 5_000,
     initialPeekMs: 5_000,
     reactionWindowMs: 3_000, // [SUPOSIÇÃO] 3 s
+    reactionClaimMs: 8_000, // time to choose cards after claiming the window
     revealMs: 3_000, // "um tempo curto" / "alguns segundos" — default chosen for this release
     turnMs: 15_000, // owner decision 9 (18/10): 15 s per decision by default (host can change it per table)
   },
@@ -168,6 +171,7 @@ export const TIMING_ENV_VARS = {
   arrangeMs: 'MOISES_ARRANGE_MS',
   initialPeekMs: 'MOISES_INITIAL_PEEK_MS',
   reactionWindowMs: 'MOISES_REACTION_WINDOW_MS',
+  reactionClaimMs: 'MOISES_REACTION_CLAIM_MS',
   revealMs: 'MOISES_REVEAL_MS',
   turnMs: 'MOISES_TURN_MS',
 } as const satisfies Record<keyof RulesConfig['timings'], string>;

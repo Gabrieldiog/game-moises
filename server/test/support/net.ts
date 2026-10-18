@@ -11,7 +11,7 @@ export type Client = ClientSocket<ServerToClientEvents, ClientToServerEvents>;
 export function fastRules(timings: Partial<RulesConfig['timings']> = {}): RulesConfig {
   return parseRules({
     ...DEFAULT_RULES,
-    timings: { arrangeMs: 60, initialPeekMs: 60, reactionWindowMs: 120, revealMs: 150, turnMs: 3_000, ...timings },
+    timings: { arrangeMs: 60, initialPeekMs: 60, reactionWindowMs: 120, reactionClaimMs: 400, revealMs: 150, turnMs: 3_000, ...timings },
   });
 }
 

@@ -54,6 +54,8 @@ Abrem a cada carta que vai para o descarte e duram uma janela curta (**[SUPOSIÇ
 - **"Filho da puta":** você sabe que a carta numa posição exata de um inimigo tem o mesmo número da descartada. Você pega a carta dele, descarta, e entrega uma das suas no lugar. Você fica com uma carta a menos; ele continua com a mesma quantidade.
 - **Erro:** se a carta indicada não tiver o mesmo número, nada sai do lugar e quem errou **revela para todos** uma carta dele: na "filha da putinha", a carta que tentou descartar; no "filho da puta", a carta que ia entregar. A carta fica visível por alguns segundos e volta a ficar virada para baixo.
 - Vale reagir ao descarte de qualquer jogador, inclusive o seu. A "filha da putinha" sempre tira uma carta **sua**; o "filho da puta" sempre tira a de um **inimigo**.
+- **Gritar:** quem quer reagir envia `claimReaction`; o primeiro trava a janela e ganha `reactionClaimMs` (padrão 8 s) para escolher as cartas. Se não agir a tempo, gasta a tentativa sem revelar nada e a janela fecha.
+- O jogador da vez (inclusive com poder pendente) também pode reagir.
 - **[SUPOSIÇÃO]** O jogador da vez usa o poder depois que a janela de reação fecha.
 
 ## Fim de jogo

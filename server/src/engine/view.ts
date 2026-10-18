@@ -56,6 +56,8 @@ export function viewFor(state: GameState, viewerId: PlayerId, now: number): Game
           card: publicCard(s.reaction.card),
           openedBy: s.reaction.openedBy,
           deadline: s.reaction.deadline,
+          claimedBy: s.reaction.claim?.by ?? null,
+          claimKind: s.reaction.claim?.kind ?? null,
           attemptedBy: [...new Set(s.reaction.attempts)],
           attemptsPerPlayer: s.rules.reactions.attemptsPerWindow,
           yourAttemptsLeft:

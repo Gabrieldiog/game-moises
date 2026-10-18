@@ -49,7 +49,7 @@ describe('power availability', () => {
   it('is optional: skipPower ends the turn', () => {
     const game = withPower('QS');
     game.act('p1', { type: 'skipPower' });
-    expect(game.lastEvents[0]).toEqual({ type: 'powerSkipped', playerId: 'p1', power: 'blindSwap', reason: 'player' });
+    expect(game.lastEvents[0]).toEqual({ type: 'powerSkipped', by: 'p1', power: 'blindSwap', reason: 'player' });
     expect(game.current).toBe('p2');
     expect(game.grid('p1').map((card) => card && key(card))).toEqual(G1.map((code) => key(c(code))));
   });
@@ -69,7 +69,7 @@ describe('power availability', () => {
     p2.grid = [null, null, null, null];
     game.state = s;
     game.act('p1', { type: 'draw' }).act('p1', { type: 'discardDrawn' }).closeWindow();
-    expect(game.lastEvents).toContainEqual({ type: 'powerSkipped', playerId: 'p1', power: 'peekOpponent', reason: 'unusable' });
+    expect(game.lastEvents).toContainEqual({ type: 'powerSkipped', by: 'p1', power: 'peekOpponent', reason: 'unusable' });
     expect(game.current).toBe('p2');
   });
 });
@@ -78,7 +78,7 @@ describe('7 / 8: see one of your cards', () => {
   it.each(['7H', '8S'])('%s shows the chosen card to its owner only, for revealMs', (card) => {
     const game = withPower(card);
     game.act('p1', { type: 'usePower', power: 'peekOwn', slot: 1 });
-    expect(game.lastEvents[0]).toEqual({ type: 'powerUsed', playerId: 'p1', power: 'peekOwn', ownSlot: 1, targets: [] });
+    expect(game.lastEvents[0]).toEqual({ type: 'powerUsed', by: 'p1', power: 'peekOwn', ownSlot: 1, targets: [] });
     expect(facesIn(game.lastEvents[0])).toEqual([]);
     expect(game.current).toBe('p2');
     onlyP1Sees(game, { p1: { 1: '3:spades' }, p2: {}, p3: {} });

@@ -3,6 +3,7 @@ import {
   type Action,
   type GameError,
   type PlayerId,
+  type ReactionKind,
   type SlotRef,
   type TurnStep,
   type UsePowerAction,
@@ -77,6 +78,8 @@ function dispatch(d: Draft, me: PlayerId, action: Action): GameError | null {
       return matchOwn(d, me, action.slot);
     case 'matchOpponent':
       return matchOpponent(d, me, action.target, action.giveSlot);
+    case 'claimReaction':
+      return claimReaction(d, me, action.kind);
   }
 }
 
@@ -191,7 +194,8 @@ function usePower(d: Draft, me: PlayerId, action: UsePowerAction): GameError | n
       const slotError = checkOccupiedSlot(player, action.slot);
       if (slotError) return slotError;
       addReveal(d, player.grid[action.slot] as NonNullable<PlayerState['grid'][number]>, [me]);
-      d.events.push({ type: 'powerUsed', playerId: me, power, ownSlot: action.slot, targets: [] });
+      d.events.push({ type: 'powerUsed', by: me, power, ownSlot: action.slot, targets: [] });
+      d.events.push({ type: 'cardPeeked', by: me, target: { playerId: me, slot: action.slot } });
       endTurn(d);
       return null;
     }
@@ -199,7 +203,8 @@ function usePower(d: Draft, me: PlayerId, action: UsePowerAction): GameError | n
       const targetError = checkOpponentTarget(s, me, action.target);
       if (targetError) return targetError;
       addReveal(d, cardAt(s, action.target), [me]);
-      d.events.push({ type: 'powerUsed', playerId: me, power, ownSlot: null, targets: [copyRef(action.target)] });
+      d.events.push({ type: 'powerUsed', by: me, power, ownSlot: null, targets: [copyRef(action.target)] });
+      d.events.push({ type: 'cardPeeked', by: me, target: copyRef(action.target) });
       endTurn(d);
       return null;
     }
@@ -209,10 +214,17 @@ function usePower(d: Draft, me: PlayerId, action: UsePowerAction): GameError | n
       swapCards(s, { playerId: me, slot: action.ownSlot }, action.target);
       d.events.push({
         type: 'powerUsed',
-        playerId: me,
+        by: me,
         power,
         ownSlot: action.ownSlot,
         targets: [copyRef(action.target)],
+      });
+      d.events.push({
+        type: 'cardsSwapped',
+        by: me,
+        a: { playerId: me, slot: action.ownSlot },
+        b: copyRef(action.target),
+        blind: true,
       });
       endTurn(d);
       return null;
@@ -242,7 +254,8 @@ function peekThenOfferSwap(d: Draft, me: PlayerId, turn: TurnState, targets: rea
   for (const target of targets) addReveal(d, cardAt(s, target), [me]);
   const power = turn.pendingPower as NonNullable<TurnState['pendingPower']>;
   turn.peeked = targets.map(copyRef);
-  d.events.push({ type: 'powerUsed', playerId: me, power, ownSlot: null, targets: targets.map(copyRef) });
+  d.events.push({ type: 'powerUsed', by: me, power, ownSlot: null, targets: targets.map(copyRef) });
+  for (const target of targets) d.events.push({ type: 'cardPeeked', by: me, target: copyRef(target) });
   if (countCards(getPlayer(s, me).grid) === 0) {
     endTurn(d); // nothing of yours to swap
     return null;
@@ -261,7 +274,13 @@ function powerSwap(d: Draft, me: PlayerId, ownSlot: number, target: SlotRef): Ga
   const slotError = checkOccupiedSlot(getPlayer(s, me), ownSlot) ?? checkOpponentTarget(s, me, target);
   if (slotError) return slotError;
   swapCards(s, { playerId: me, slot: ownSlot }, target);
-  d.events.push({ type: 'powerSwapped', playerId: me, ownSlot, target: copyRef(target) });
+  d.events.push({
+    type: 'cardsSwapped',
+    by: me,
+    a: { playerId: me, slot: ownSlot },
+    b: copyRef(target),
+    blind: false,
+  });
   endTurn(d);
   return null;
 }
@@ -270,7 +289,7 @@ function skipPower(d: Draft, me: PlayerId): GameError | null {
   const turn = requireTurn(d, me, ['power', 'powerSwap']);
   if (isError(turn)) return turn;
   const power = turn.pendingPower as NonNullable<TurnState['pendingPower']>;
-  d.events.push({ type: 'powerSkipped', playerId: me, power, reason: 'player' });
+  d.events.push({ type: 'powerSkipped', by: me, power, reason: 'player' });
   endTurn(d);
   return null;
 }
@@ -289,10 +308,41 @@ function requireReactionWindow(d: Draft, me: PlayerId): GameError | null {
   return null;
 }
 
+/** Only the claimant may react while the window is locked, and only with the claimed kind. */
+function checkClaim(d: Draft, me: PlayerId, kind: ReactionKind): GameError | null {
+  const claim = (d.s.reaction as NonNullable<GameState['reaction']>).claim;
+  if (!claim) return null;
+  if (claim.by !== me) return gameError('REACTION_CLAIMED', 'another player claimed this reaction');
+  if (claim.kind !== kind) return gameError('INVALID_ACTION', `you claimed "${claim.kind}", not "${kind}"`);
+  return null;
+}
+
+/** After a wrong reaction by the claimant: release the lock and give the table a short window again. */
+function releaseClaim(d: Draft): void {
+  const reaction = d.s.reaction as NonNullable<GameState['reaction']>;
+  if (!reaction.claim) return;
+  reaction.claim = null;
+  reaction.deadline = Math.max(reaction.baseDeadline, d.now + d.s.rules.timings.reactionWindowMs);
+}
+
+function claimReaction(d: Draft, me: PlayerId, kind: ReactionKind): GameError | null {
+  const windowError = requireReactionWindow(d, me);
+  if (windowError) return windowError;
+  if (!d.s.rules.reactions[kind]) return gameError('REACTION_DISABLED', `${kind} is switched off for this game`);
+  const reaction = d.s.reaction as NonNullable<GameState['reaction']>;
+  if (reaction.claim) return gameError('REACTION_CLAIMED', 'this reaction window is already claimed');
+  reaction.claim = { by: me, kind };
+  reaction.deadline = d.now + d.s.rules.timings.reactionClaimMs;
+  d.events.push({ type: 'reactionClaimed', by: me, kind });
+  return null;
+}
+
 function matchOwn(d: Draft, me: PlayerId, slot: number): GameError | null {
   const windowError = requireReactionWindow(d, me);
   if (windowError) return windowError;
   if (!d.s.rules.reactions.matchOwn) return gameError('REACTION_DISABLED', 'matchOwn is switched off for this game');
+  const claimError = checkClaim(d, me, 'matchOwn');
+  if (claimError) return claimError;
   const s = d.s;
   const reaction = s.reaction as NonNullable<GameState['reaction']>;
   const player = getPlayer(s, me);
@@ -305,12 +355,15 @@ function matchOwn(d: Draft, me: PlayerId, slot: number): GameError | null {
     player.grid[slot] = null;
     discard(d, card);
     d.events.push({ type: 'reactionSucceeded', reaction: 'matchOwn', playerId: me, slot, card: publicCard(card) });
+    d.events.push({ type: 'reactionResolved', by: me, kind: 'matchOwn', ok: true, slots: [{ playerId: me, slot }] });
     closeReactionWindow(d, 'matched'); // only the first right reaction counts
     return null;
   }
   // Wrong: nothing moves; the card you tried to discard is shown to everyone for a while.
   addReveal(d, card, 'all');
   d.events.push({ type: 'reactionFailed', reaction: 'matchOwn', playerId: me, slot, revealed: publicCard(card) });
+  d.events.push({ type: 'reactionResolved', by: me, kind: 'matchOwn', ok: false, slots: [{ playerId: me, slot }] });
+  releaseClaim(d);
   return null;
 }
 
@@ -320,6 +373,8 @@ function matchOpponent(d: Draft, me: PlayerId, target: SlotRef, giveSlot: number
   if (!d.s.rules.reactions.matchOpponent) {
     return gameError('REACTION_DISABLED', 'matchOpponent is switched off for this game');
   }
+  const claimError = checkClaim(d, me, 'matchOpponent');
+  if (claimError) return claimError;
   const s = d.s;
   const reaction = s.reaction as NonNullable<GameState['reaction']>;
   const targetError = checkOpponentTarget(s, me, target);
@@ -345,6 +400,7 @@ function matchOpponent(d: Draft, me: PlayerId, target: SlotRef, giveSlot: number
       giveSlot,
       card: publicCard(theirs),
     });
+    d.events.push({ type: 'reactionResolved', by: me, kind: 'matchOpponent', ok: true, slots: pairSlots(me, giveSlot, target) });
     closeReactionWindow(d, 'matched');
     return null;
   }
@@ -359,6 +415,8 @@ function matchOpponent(d: Draft, me: PlayerId, target: SlotRef, giveSlot: number
     giveSlot,
     revealed: publicCard(mine),
   });
+  d.events.push({ type: 'reactionResolved', by: me, kind: 'matchOpponent', ok: false, slots: pairSlots(me, giveSlot, target) });
+  releaseClaim(d);
   return null;
 }
 
@@ -389,6 +447,10 @@ function swapCards(s: GameState, a: SlotRef, b: SlotRef): void {
   const cardA = gridA[a.slot] ?? null;
   gridA[a.slot] = gridB[b.slot] ?? null;
   gridB[b.slot] = cardA;
+}
+
+function pairSlots(me: PlayerId, giveSlot: number, target: SlotRef): SlotRef[] {
+  return [copyRef(target), { playerId: me, slot: giveSlot }];
 }
 
 function copyRef(ref: SlotRef): SlotRef {

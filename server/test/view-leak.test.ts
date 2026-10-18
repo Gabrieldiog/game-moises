@@ -163,6 +163,7 @@ function chooseMove(s: GameState, rand: () => number, callEndAfterTurn: number):
       { type: 'discardDrawn' },
       { type: 'swapWithDrawn', slot: slot() },
       { type: 'matchOwn', slot: slot() },
+      { type: 'claimReaction', kind: 'matchOwn' },
       { type: 'matchOpponent', target: target(), giveSlot: slot() },
       { type: 'usePower', power: 'peekOwn', slot: slot() },
       { type: 'usePower', power: 'peekOpponent', target: target() },
@@ -183,8 +184,14 @@ function chooseMove(s: GameState, rand: () => number, callEndAfterTurn: number):
   const me = s.turn.playerId;
 
   if (s.reaction) {
+    // Deterministic from the state, so the main random sequence stays the same.
+    if (!s.reaction.claim && s.turnCount % 6 === 0 && s.reaction.attempts.length === 0) {
+      const claimer = ids[s.turnCount % ids.length] as PlayerId;
+      return { playerId: claimer, action: { type: 'claimReaction', kind: s.turnCount % 12 === 0 ? 'matchOwn' : 'matchOpponent' } };
+    }
     if (rand() < 0.35) {
-      const reactor = someone();
+      const claimer = s.reaction.claim;
+      const reactor = claimer && s.turnCount % 5 !== 0 ? claimer.by : someone();
       return rand() < 0.5
         ? { playerId: reactor, action: { type: 'matchOwn', slot: slot() % 4 } }
         : { playerId: reactor, action: { type: 'matchOpponent', target: target(reactor), giveSlot: slot() % 4 } };
@@ -323,7 +330,10 @@ describe('property: random full games never leak and keep invariants', () => {
       'powerUsed:blindSwap',
       'powerUsed:peekAndSwap',
       'powerUsed:peekManyAndSwap',
-      'powerSwapped',
+      'cardsSwapped',
+      'cardPeeked',
+      'reactionClaimed',
+      'reactionResolved',
       'powerSkipped',
       'reactionSucceeded:matchOwn',
       'reactionSucceeded:matchOpponent',

@@ -33,6 +33,7 @@ describe('DEFAULT_RULES', () => {
       arrangeMs: 5000,
       initialPeekMs: 5000,
       reactionWindowMs: 3000,
+      reactionClaimMs: 8000,
       revealMs: 3000,
       turnMs: 15000,
     });
@@ -64,6 +65,7 @@ describe('loadRules', () => {
       arrangeMs: 7000,
       initialPeekMs: 4000,
       reactionWindowMs: 2500,
+      reactionClaimMs: 8000,
       revealMs: 1500,
       turnMs: 20000,
     });

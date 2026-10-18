@@ -6,6 +6,7 @@ import type {
   PlayerId,
   PlayerView,
   PowerKind,
+  ReactionKind,
   ReactionWindowView,
   SlotRef,
 } from '@moises/shared';
@@ -102,8 +103,14 @@ export class Bot {
 
     const window = view.reactionWindow;
     if (window && (window.yourAttemptsLeft ?? 0) > 0) {
-      const reaction = this.chooseReaction(view, me, window);
-      if (reaction) return reaction;
+      const claimedByOther = window.claimedBy !== null && window.claimedBy !== this.id;
+      const reaction = claimedByOther ? null : this.chooseReaction(view, me, window);
+      if (reaction) {
+        // Shout first (claimReaction locks the window), then pick the cards.
+        if (window.claimedBy === null) return { type: 'claimReaction', kind: reaction.type as ReactionKind };
+        if (window.claimKind === reaction.type) return reaction;
+      }
+      if (window.claimedBy !== null) return null;
     }
 
     const turn = view.turn;
@@ -140,15 +147,8 @@ export class Bot {
       case 'drawnCardDiscarded':
         if (event.playerId === this.id) this.holding = null;
         return;
-      case 'powerUsed': {
-        const target = event.targets[0];
-        if (event.power === 'blindSwap' && event.ownSlot !== null && target) {
-          this.memory.swap({ playerId: event.playerId, slot: event.ownSlot }, target);
-        }
-        return;
-      }
-      case 'powerSwapped':
-        this.memory.swap({ playerId: event.playerId, slot: event.ownSlot }, event.target);
+      case 'cardsSwapped':
+        this.memory.swap(event.a, event.b);
         return;
       case 'reactionSucceeded':
         if (event.reaction === 'matchOwn') this.memory.forget(event.playerId, event.slot);
