@@ -61,6 +61,13 @@ export const RulesConfigSchema = z
       reactionWindowMs: DurationMsSchema,
       /** How long a seen card stays face up: power peeks, and the card revealed to all after a wrong reaction. */
       revealMs: DurationMsSchema,
+      /**
+       * Turn timer: time the current player has for each decision of their turn
+       * (draw, keep/discard, use/skip the power). When it runs out the server
+       * plays the rest of that turn minimally. Enforced by the server's game
+       * session, not by the engine (the engine stays timer-free).
+       */
+      turnMs: DurationMsSchema,
     }),
   })
   .superRefine((rules, ctx) => {
@@ -142,6 +149,7 @@ export const DEFAULT_RULES: RulesConfig = deepFreeze({
     initialPeekMs: 5_000,
     reactionWindowMs: 3_000, // [SUPOSIÇÃO] 3 s
     revealMs: 3_000, // "um tempo curto" / "alguns segundos" — default chosen for this release
+    turnMs: 30_000, // v0.2: 30 s per decision of the turn — default chosen for this release
   },
 });
 
@@ -155,6 +163,7 @@ export const TIMING_ENV_VARS = {
   initialPeekMs: 'MOISES_INITIAL_PEEK_MS',
   reactionWindowMs: 'MOISES_REACTION_WINDOW_MS',
   revealMs: 'MOISES_REVEAL_MS',
+  turnMs: 'MOISES_TURN_MS',
 } as const satisfies Record<keyof RulesConfig['timings'], string>;
 
 const EnvMsSchema = z

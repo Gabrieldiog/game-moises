@@ -76,4 +76,4 @@ Pontos que a descrição original não cobria. Todos ficam em `server/src/config
 - Carta vista (poder ou erro de reação) fica aberta por **3 s**.
 - Poder sem alvo possível (ex.: inimigos sem cartas) é pulado automaticamente.
 - O descarte começa vazio.
-- Ainda não existe limite de tempo para o turno. Ele entra na v0.2, junto com os bots.
+- **Timer de turno (v0.2):** o jogador da vez tem **30 s** (`turnMs`, configurável por `MOISES_TURN_MS`) para **cada decisão** do turno: comprar, ficar com a carta ou descartar, usar ou pular o poder. A janela de reação não conta (tem prazo próprio). Se o tempo acabar, o servidor joga o mínimo pelo resto daquele turno: compra se ainda não comprou, descarta a carta comprada e pula o poder. Vale também para jogadores desconectados. O motor continua sem timers; quem aplica o prazo é o servidor.
