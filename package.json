@@ -4,7 +4,8 @@
   "type": "module",
   "workspaces": [
     "shared",
-    "server"
+    "server",
+    "client"
   ],
   "engines": {
     "node": ">=22.12.0"
@@ -12,10 +13,12 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build": "npm run build -w client"
   },
   "devDependencies": {
     "@types/node": "^22.19.0",
+    "jsdom": "^29.1.1",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
   }
