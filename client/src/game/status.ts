@@ -36,7 +36,11 @@ export function statusLines(view: GameView, ctx: UiContext, picks: Picks): Statu
     case 'myDecide':
       return { title: T.yourTurn, hint: T.decideHint, tone: 'mine' };
     case 'myPower':
-      return { title: T.powerTitle(POWER_TEXT[ctx.power].name), hint: POWER_TEXT[ctx.power].hint, tone: 'mine' };
+      return {
+        title: T.powerTitle(POWER_TEXT[ctx.power].name),
+        hint: ctx.power === 'peekManyAndSwap' && ctx.targetCount !== null ? T.peekManyHint(ctx.targetCount) : POWER_TEXT[ctx.power].hint,
+        tone: 'mine',
+      };
     case 'myPowerSwap':
       return {
         title: T.powerSwapTitle,

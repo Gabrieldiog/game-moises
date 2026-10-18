@@ -1,18 +1,27 @@
-import type { Action, GameView } from '@moises/shared';
+import type { Action, GameView, RoomClosedReason, RoomSettingsView } from '@moises/shared';
 import { clockOffset } from '../game/clock';
 import type { ConnectionError, ConnectionStatus, GameConnection, RoomView } from './types';
 
+export type NoticeContent =
+  | { readonly kind: 'error'; readonly error: ConnectionError }
+  | { readonly kind: 'roomClosed'; readonly reason: RoomClosedReason }
+  | { readonly kind: 'sessionLost' };
+
 export interface ConnectionNotice {
   readonly id: number;
-  readonly error: ConnectionError;
+  readonly content: NoticeContent;
 }
 
 export interface ConnectionSnapshot {
   readonly status: ConnectionStatus;
   readonly room: RoomView | null;
   readonly view: GameView | null;
-  /** view.now - Date.now() measured when the last view arrived. */
+  /** GameUpdate.turnDeadline of the last update (server clock). */
+  readonly turnDeadline: number | null;
+  /** view.now - Date.now() measured when the last update arrived. */
   readonly clockOffset: number;
+  /** Room settings the server reported last (kept after leaving, to size pickers). */
+  readonly knownSettings: RoomSettingsView | null;
   readonly notice: ConnectionNotice | null;
   readonly lastSent: Action | null;
 }
@@ -35,7 +44,9 @@ export class ConnectionStore {
       status: connection.getStatus(),
       room: null,
       view: null,
+      turnDeadline: null,
       clockOffset: 0,
+      knownSettings: null,
       notice: null,
       lastSent: null,
     };
@@ -45,14 +56,26 @@ export class ConnectionStore {
           this.set({ status: event.status });
           break;
         case 'room':
-          this.set({ room: event.room, ...(event.room === null ? { view: null } : {}) });
+          this.set({
+            room: event.room,
+            ...(event.room === null ? { view: null, turnDeadline: null } : { knownSettings: event.room.settings }),
+          });
           break;
-        case 'view':
-          this.set({ view: event.view, clockOffset: clockOffset(event.view.now, this.localNow()) });
+        case 'update':
+          this.set({
+            view: event.update.view,
+            turnDeadline: event.update.turnDeadline,
+            clockOffset: clockOffset(event.update.view.now, this.localNow()),
+          });
           break;
         case 'error':
-          this.noticeSeq += 1;
-          this.set({ notice: { id: this.noticeSeq, error: event.error } });
+          this.notify({ kind: 'error', error: event.error });
+          break;
+        case 'roomClosed':
+          this.notify({ kind: 'roomClosed', reason: event.info.reason });
+          break;
+        case 'sessionLost':
+          this.notify({ kind: 'sessionLost' });
           break;
       }
     });
@@ -67,7 +90,12 @@ export class ConnectionStore {
 
   send(action: Action): void {
     this.set({ lastSent: action });
-    this.connection.send(action);
+    void this.connection.send(action);
+  }
+
+  /** Closes the final screen and goes back to the room (the server keeps the room in 'ended'). */
+  dismissGame(): void {
+    this.set({ view: null, turnDeadline: null });
   }
 
   dismissNotice(id: number): void {
@@ -77,6 +105,11 @@ export class ConnectionStore {
   dispose(): void {
     this.unsubscribe();
     this.listeners.clear();
+  }
+
+  private notify(content: NoticeContent): void {
+    this.noticeSeq += 1;
+    this.set({ notice: { id: this.noticeSeq, content } });
   }
 
   private set(patch: Partial<ConnectionSnapshot>): void {

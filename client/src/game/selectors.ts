@@ -50,7 +50,7 @@ export function hasTimedCards(view: GameView, serverNow: number): boolean {
   );
 }
 
-export type CountdownKind = 'arrange' | 'initialPeek' | 'reaction';
+export type CountdownKind = 'arrange' | 'initialPeek' | 'reaction' | 'turn';
 
 export interface ActiveCountdown {
   readonly kind: CountdownKind;
@@ -58,16 +58,20 @@ export interface ActiveCountdown {
 }
 
 /**
- * The deadline currently shown to the player. GameView only carries deadlines
- * for the setup phases and the reaction window; a turn deadline will be shown
- * as soon as the server adds it to the view.
+ * The deadline currently shown to the player: the setup phases and the
+ * reaction window come in the GameView; the time left for the current
+ * player's decision is GameUpdate.turnDeadline (null while not waiting for them).
+ * All of them are server clock.
  */
-export function activeCountdown(view: GameView): ActiveCountdown | null {
+export function activeCountdown(view: GameView, turnDeadline: number | null = null): ActiveCountdown | null {
   if ((view.phase === 'arrange' || view.phase === 'initialPeek') && view.phaseDeadline !== null) {
     return { kind: view.phase, deadline: view.phaseDeadline };
   }
   if (view.phase === 'playing' && view.reactionWindow) {
     return { kind: 'reaction', deadline: view.reactionWindow.deadline };
+  }
+  if (view.phase === 'playing' && view.turn !== null && turnDeadline !== null) {
+    return { kind: 'turn', deadline: turnDeadline };
   }
   return null;
 }
@@ -79,7 +83,8 @@ export type UiContext =
   | { readonly kind: 'initialPeek' }
   | { readonly kind: 'myDraw' }
   | { readonly kind: 'myDecide' }
-  | { readonly kind: 'myPower'; readonly power: PowerKind }
+  /** targetCount: TurnView.powerTargetCount, how many cards the server expects (null if unknown). */
+  | { readonly kind: 'myPower'; readonly power: PowerKind; readonly targetCount: number | null }
   | { readonly kind: 'myPowerSwap'; readonly peeked: readonly SlotRef[] }
   | { readonly kind: 'reaction'; readonly canReact: boolean }
   | { readonly kind: 'waiting'; readonly playerId: PlayerId | null }
@@ -107,7 +112,9 @@ export function uiContext(view: GameView, serverNow: number): UiContext {
     case 'decide':
       return { kind: 'myDecide' };
     case 'power':
-      return turn.pendingPower ? { kind: 'myPower', power: turn.pendingPower } : { kind: 'waiting', playerId: turn.playerId };
+      return turn.pendingPower
+        ? { kind: 'myPower', power: turn.pendingPower, targetCount: turn.powerTargetCount ?? null }
+        : { kind: 'waiting', playerId: turn.playerId };
     case 'powerSwap':
       return { kind: 'myPowerSwap', peeked: turn.peeked };
     case 'reaction':

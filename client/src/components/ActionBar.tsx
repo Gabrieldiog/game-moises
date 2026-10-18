@@ -66,13 +66,14 @@ export function ActionBar({ ctx, picks, shout, onSend, onShout, onCancel }: Acti
       break;
     }
     case 'myPower': {
-      const action = usePowerAction(ctx.power, picks);
+      const action = usePowerAction(ctx.power, picks, ctx.targetCount);
       const text = POWER_TEXT[ctx.power];
-      const many = ctx.power === 'peekManyAndSwap' && picks.opponents.length > 0;
+      const many = ctx.power === 'peekManyAndSwap';
+      const count = ctx.targetCount !== null ? T.pickedOf(picks.opponents.length, ctx.targetCount) : String(picks.opponents.length);
       row = (
         <>
           <Btn primary disabled={!action} onClick={() => action && onSend(action)}>
-            {many ? `${text.confirm} (${picks.opponents.length})` : text.confirm}
+            {many && (picks.opponents.length > 0 || ctx.targetCount !== null) ? `${text.confirm} (${count})` : text.confirm}
           </Btn>
           <Btn onClick={() => onSend({ type: 'skipPower' })}>{T.skipPower}</Btn>
         </>

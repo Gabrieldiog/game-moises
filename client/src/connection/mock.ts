@@ -1,26 +1,28 @@
-import { parseAction, type Action, type GameView } from '@moises/shared';
+import { ROOM_CODE_ALPHABET, parseAction, type Action, type GameView, type RoomMemberView, type RoomView } from '@moises/shared';
 import {
   DEMO_NAMES,
   DEMO_SCRIPT,
   DEMO_SERVER,
   buildScenario,
+  scenarioTurnDeadline,
   type ScenarioId,
 } from '../demo/fixtures';
 import type {
+  ConnectionError,
   ConnectionEvent,
   ConnectionListener,
   ConnectionStatus,
-  CreateRoomRequest,
   GameConnection,
-  JoinRoomRequest,
-  RoomSeat,
-  RoomView,
+  RequestName,
+  RequestResult,
 } from './types';
+import { checkBots, checkCode, checkName } from './validate';
 
-// Local stand-in for the game server: answers lobby requests with fake rooms
-// and plays back fixture GameViews. It never decides a real game outcome; the
-// little "script" in DEMO_SCRIPT only moves between fixtures so the demo feels
-// alive. Replaced by the Socket.IO implementation when the server is ready.
+// Local stand-in for the game server, used ONLY by the demo mode (no
+// VITE_SERVER_URL, or ?demo=...). It answers lobby requests with fake rooms in
+// the official RoomView shape and plays back fixture GameViews. It never
+// decides a real game outcome; the little "script" in DEMO_SCRIPT only moves
+// between fixtures so the demo feels alive.
 
 type Timer = ReturnType<typeof setTimeout>;
 
@@ -36,21 +38,21 @@ export interface MockOptions {
   readonly now?: () => number;
 }
 
-const BOT_NAMES = ['Bot Zé', 'Bot Cida', 'Bot Tonho', 'Bot Neide', 'Bot Juca'] as const;
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const YOU = 's0';
+const OK: RequestResult = { ok: true };
 
 export class MockConnection implements GameConnection {
   readonly kind = 'mock' as const;
   private status: ConnectionStatus = 'idle';
   private readonly listeners = new Set<ConnectionListener>();
   private room: RoomView | null = null;
-  private yourName = DEMO_NAMES[0] as string;
   private scenario: ScenarioId | null = null;
   private names: readonly string[] | undefined;
   private players: number;
   private timer: Timer | null = null;
   private readonly sent: Action[] = [];
   private readonly now: () => number;
+  private botSeq = 0;
 
   constructor(private readonly options: MockOptions = {}) {
     this.players = options.players ?? DEMO_SERVER.players.min;
@@ -82,83 +84,80 @@ export class MockConnection implements GameConnection {
     return () => this.listeners.delete(listener);
   }
 
-  createRoom({ name, mode }: CreateRoomRequest): void {
-    if (!this.checkName(name)) return;
-    this.yourName = name.trim();
-    this.setRoom({
-      code: randomCode(),
-      mode,
-      seats: [{ id: 's0', name: this.yourName, isBot: false, isHost: true, isYou: true }],
-    });
+  createRoom(name: string): Promise<RequestResult> {
+    const checked = checkName(name, 'room:create');
+    if (!checked.ok) return this.refuse(checked.error);
+    this.setRoom(randomCode(), 'lobby', YOU, [member(YOU, checked.value, false)]);
+    return Promise.resolve(OK);
   }
 
-  joinRoom({ code, name }: JoinRoomRequest): void {
-    if (!this.checkName(name)) return;
-    const clean = code.trim().toUpperCase();
-    if (clean === '') {
-      this.emit({ type: 'error', error: { code: 'ROOM_NOT_FOUND', message: 'empty room code' } });
-      return;
-    }
-    this.yourName = name.trim();
-    this.setRoom({
-      code: clean,
-      mode: 'online',
-      seats: [
-        { id: 's1', name: DEMO_NAMES[1], isBot: false, isHost: true, isYou: false },
-        { id: 's0', name: this.yourName, isBot: false, isHost: false, isYou: true },
-      ],
-    });
+  joinRoom(code: string, name: string): Promise<RequestResult> {
+    const checkedName = checkName(name, 'room:join');
+    if (!checkedName.ok) return this.refuse(checkedName.error);
+    const checkedCode = checkCode(code);
+    if (!checkedCode.ok) return this.refuse(checkedCode.error);
+    this.setRoom(checkedCode.value, 'lobby', 's1', [member('s1', DEMO_NAMES[1], false), member(YOU, checkedName.value, false)]);
+    return Promise.resolve(OK);
   }
 
-  addBot(): void {
+  quickPlay(name: string, bots: number): Promise<RequestResult> {
+    const checkedName = checkName(name, 'room:quickPlay');
+    if (!checkedName.ok) return this.refuse(checkedName.error);
+    const checkedBots = checkBots(bots);
+    if (!checkedBots.ok) return this.refuse(checkedBots.error);
+    if (1 + checkedBots.value > DEMO_SERVER.players.max) return this.refuse(error('ROOM_FULL', 'room:quickPlay'));
+    const members = [member(YOU, checkedName.value, false), ...Array.from({ length: checkedBots.value }, () => this.newBot())];
+    this.setRoom(randomCode(), 'lobby', YOU, members);
+    return this.startGame();
+  }
+
+  addBot(): Promise<RequestResult> {
     const room = this.room;
-    if (!room || !room.canAddBot) {
-      this.emit({ type: 'error', error: { code: 'ROOM_FULL', message: 'no free seat' } });
-      return;
-    }
-    const used = new Set(room.seats.map((s) => s.name));
-    const name = BOT_NAMES.find((b) => !used.has(b)) ?? `Bot ${room.seats.length}`;
-    this.setRoom({
-      ...room,
-      seats: [...room.seats, { id: `bot${room.seats.length}`, name, isBot: true, isHost: false, isYou: false }],
-    });
+    if (!room) return this.refuse(error('NOT_IN_ROOM', 'room:addBot'));
+    if (room.hostId !== YOU) return this.refuse(error('NOT_HOST', 'room:addBot'));
+    if (room.members.length >= DEMO_SERVER.players.max) return this.refuse(error('ROOM_FULL', 'room:addBot'));
+    this.setRoom(room.code, room.status, room.hostId, [...room.members, this.newBot()]);
+    return Promise.resolve(OK);
   }
 
-  removeBot(botId: string): void {
+  removeBot(botId: string): Promise<RequestResult> {
     const room = this.room;
-    if (!room) return;
-    this.setRoom({ ...room, seats: room.seats.filter((s) => !(s.isBot && s.id === botId)) });
+    if (!room) return this.refuse(error('NOT_IN_ROOM', 'room:removeBot'));
+    if (!room.members.some((m) => m.id === botId && m.isBot)) return this.refuse(error('NOT_A_BOT', 'room:removeBot'));
+    this.setRoom(room.code, room.status, room.hostId, room.members.filter((m) => m.id !== botId));
+    return Promise.resolve(OK);
   }
 
-  startGame(): void {
+  startGame(): Promise<RequestResult> {
     const room = this.room;
-    if (!room || !room.canStart) {
-      this.emit({ type: 'error', error: { code: 'NOT_HOST', message: 'cannot start' } });
-      return;
-    }
+    if (!room) return this.refuse(error('NOT_IN_ROOM', 'room:start'));
+    if (room.hostId !== YOU) return this.refuse(error('NOT_HOST', 'room:start'));
+    if (room.members.length < DEMO_SERVER.players.min) return this.refuse(error('NOT_ENOUGH_PLAYERS', 'room:start'));
+    this.setRoom(room.code, 'playing', room.hostId, room.members);
     // You sit first in the fixtures; the others keep the room order.
-    const others = room.seats.filter((s) => !s.isYou).map((s) => s.name);
-    this.loadScenario('arrumacao', room.seats.length, [this.yourName, ...others]);
+    const others = room.members.filter((m) => m.id !== YOU).map((m) => m.name);
+    const you = room.members.find((m) => m.id === YOU)?.name ?? DEMO_NAMES[0];
+    this.loadScenario('arrumacao', room.members.length, [you, ...others]);
+    return Promise.resolve(OK);
   }
 
-  leaveRoom(): void {
+  leaveRoom(): Promise<RequestResult> {
     this.clearTimer();
     this.scenario = null;
     this.room = null;
     this.emit({ type: 'room', room: null });
+    return Promise.resolve(OK);
   }
 
-  send(action: Action): void {
+  send(action: Action): Promise<RequestResult> {
     // Sanity check of our own message shape (the real server validates again).
     const parsed = parseAction(action);
-    if (!parsed.ok) {
-      this.emit({ type: 'error', error: { code: 'INVALID_ACTION', message: parsed.issues.join('; ') } });
-      return;
-    }
+    if (!parsed.ok) return this.refuse({ code: 'BAD_REQUEST', request: 'game:action', message: parsed.issues.join('; ') });
     this.sent.push(parsed.action);
-    if (this.options.autoAdvance === false || !this.scenario) return;
+    if (this.options.autoAdvance === false || !this.scenario) return Promise.resolve(OK);
     const next = DEMO_SCRIPT[this.scenario]?.onAction?.[parsed.action.type];
     if (next) this.loadScenario(next, this.players, this.names);
+    return Promise.resolve(OK);
   }
 
   // --- demo controls ------------------------------------------------------------
@@ -169,13 +168,17 @@ export class MockConnection implements GameConnection {
     this.scenario = id;
     this.players = players;
     this.names = names;
+    const timing = this.options.timeScale ? { timeScale: this.options.timeScale } : {};
     const view = buildScenario(id, {
       players,
       now: this.now(), // the mock "server" clock is the local clock
       ...(names ? { names } : {}),
-      ...(this.options.timeScale ? { timeScale: this.options.timeScale } : {}),
+      ...timing,
     });
-    this.emit({ type: 'view', view });
+    if (this.room && view.phase === 'ended' && this.room.status !== 'ended') {
+      this.setRoom(this.room.code, 'ended', this.room.hostId, this.room.members);
+    }
+    this.emit({ type: 'update', update: { view, turnDeadline: scenarioTurnDeadline(view, timing), events: [] } });
     this.scheduleDeadline(id, view);
     return view;
   }
@@ -203,22 +206,28 @@ export class MockConnection implements GameConnection {
     this.timer = null;
   }
 
-  private checkName(name: string): boolean {
-    if (name.trim() !== '') return true;
-    this.emit({ type: 'error', error: { code: 'INVALID_NAME', message: 'empty name' } });
-    return false;
+  private newBot(): RoomMemberView {
+    this.botSeq += 1;
+    return member(`bot${this.botSeq}`, `Bot ${this.botSeq}`, true);
   }
 
-  private setRoom(room: Omit<RoomView, 'minPlayers' | 'maxPlayers' | 'canStart' | 'canAddBot'>): void {
-    const you = room.seats.find((s: RoomSeat) => s.isYou);
-    const isHost = you?.isHost ?? false;
-    const full = room.seats.length >= DEMO_SERVER.players.max;
+  private refuse(err: ConnectionError): Promise<RequestResult> {
+    this.emit({ type: 'error', error: err });
+    return Promise.resolve({ ok: false, error: err });
+  }
+
+  private setRoom(code: string, status: RoomView['status'], hostId: string, members: readonly RoomMemberView[]): void {
     this.room = {
-      ...room,
-      minPlayers: DEMO_SERVER.players.min,
-      maxPlayers: DEMO_SERVER.players.max,
-      canStart: isHost && room.seats.length >= DEMO_SERVER.players.min,
-      canAddBot: isHost && !full,
+      code,
+      status,
+      you: YOU,
+      hostId,
+      members: members.map((m) => ({ ...m, isHost: m.id === hostId })),
+      settings: {
+        minPlayers: DEMO_SERVER.players.min,
+        maxPlayers: DEMO_SERVER.players.max,
+        turnMs: DEMO_SERVER.timings.turnMs,
+      },
     };
     this.emit({ type: 'room', room: this.room });
   }
@@ -233,8 +242,16 @@ export class MockConnection implements GameConnection {
   }
 }
 
+function member(id: string, name: string, isBot: boolean): RoomMemberView {
+  return { id, name, isBot, isHost: false, connected: true };
+}
+
+function error(code: ConnectionError['code'], request: RequestName): ConnectionError {
+  return { code, request, message: code.toLowerCase().replaceAll('_', ' ') };
+}
+
 function randomCode(): string {
-  const bytes = new Uint8Array(4);
+  const bytes = new Uint8Array(6);
   crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join('');
+  return Array.from(bytes, (b) => ROOM_CODE_ALPHABET[b % ROOM_CODE_ALPHABET.length]).join('');
 }

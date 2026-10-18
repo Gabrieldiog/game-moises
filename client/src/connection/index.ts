@@ -1,17 +1,19 @@
 import type { ClientConfig } from '../config';
 import { MockConnection } from './mock';
+import { SocketConnection } from './socket';
 import type { GameConnection } from './types';
 
 export type { GameConnection } from './types';
 
 /**
- * Picks the transport. The Socket.IO implementation is written together with
- * the server (it is not part of v0.3), so every build uses the local mock for
- * now, even when VITE_SERVER_URL is set; the UI says so to the player.
+ * Picks the transport:
+ * - VITE_SERVER_URL set (and no ?demo=): the real server over Socket.IO;
+ * - otherwise: the local demo match (mock), as before. `?demo=<cena>` always
+ *   opens the demo, even in a build that has a server URL.
  */
 export function createConnection(config: ClientConfig): { connection: GameConnection; mock: MockConnection | null } {
-  if (config.serverUrl !== null) {
-    console.warn('[moises] VITE_SERVER_URL is set, but the Socket.IO transport is not implemented yet; using the local mock.');
+  if (config.serverUrl !== null && config.demo === null) {
+    return { connection: new SocketConnection({ url: config.serverUrl }), mock: null };
   }
   const mock = new MockConnection({
     ...(config.demo?.scenario ? { scenario: config.demo.scenario } : {}),

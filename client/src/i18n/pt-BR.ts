@@ -1,5 +1,20 @@
-import type { Card, ErrorCode, GameOverReason, PowerKind, Rank, Suit } from '@moises/shared';
-import type { ConnectionError, ConnectionStatus, LobbyErrorCode } from '../connection/types';
+import type {
+  Card,
+  ErrorCode,
+  GameOverReason,
+  PowerKind,
+  ProtocolErrorCode,
+  Rank,
+  RoomClosedReason,
+  Suit,
+} from '@moises/shared';
+import type {
+  ClientErrorCode,
+  ConnectionError,
+  ConnectionErrorCode,
+  ConnectionStatus,
+  RequestName,
+} from '../connection/types';
 
 // Every user-facing string of the client. Card values, timings and limits are
 // never written here: they come from the server (GameView / RoomView).
@@ -95,11 +110,14 @@ export const T = {
   createRoom: 'Criar sala',
   joinTitle: 'Entrar com código',
   codeLabel: 'Código da sala',
-  codePlaceholder: 'Ex.: K7Q2',
+  codePlaceholder: 'Ex.: K7QX2M',
   join: 'Entrar',
-  playBots: 'Jogar contra bots',
+  playBots: (n: number) => (n === 1 ? 'Jogar contra 1 bot' : `Jogar contra ${n} bots`),
+  fewerBots: 'Menos bots',
+  moreBots: 'Mais bots',
+  botsLabel: 'Bots',
   or: 'ou',
-  mockNotice: 'Sem servidor configurado: salas e partidas são de demonstração, só neste aparelho.',
+  mockNotice: 'Modo demonstração: salas e partidas são de mentirinha, só neste aparelho, sem servidor.',
   roomTitle: (code: string) => `Sala ${code}`,
   botRoomTitle: 'Partida contra bots',
   roomShare: 'Mande este código para a galera entrar.',
@@ -107,6 +125,11 @@ export const T = {
   codeCopied: 'Código copiado',
   seatsCount: (taken: number, max: number) => `${taken} de ${max} lugares`,
   minPlayersHint: (min: number) => `A partida começa com pelo menos ${min} jogadores.`,
+  turnTimeHint: (seconds: number) => `Cada jogada tem ${seconds} segundos.`,
+  roomEndedTitle: 'Partida encerrada',
+  playAgain: 'Jogar de novo',
+  waitingHostAgain: 'Esperando o anfitrião começar outra partida.',
+  offline: 'desconectado',
   host: 'anfitrião',
   bot: 'bot',
   addBot: 'Adicionar bot',
@@ -169,6 +192,11 @@ export const T = {
   skipPower: 'Pular',
   keepAsIs: 'Não trocar',
   powerSwap: 'Trocar',
+  pickedOf: (picked: number, total: number) => `${picked}/${total}`,
+  peekManyHint: (n: number) =>
+    n === 1
+      ? 'Toque numa carta de um inimigo para ver. Depois você decide se troca.'
+      : `Toque em ${n} cartas de inimigos para ver. Depois você decide se troca uma delas.`,
   pickCards: (n: number) => (n === 0 ? 'Toque nas cartas' : `${n} ${n === 1 ? 'carta escolhida' : 'cartas escolhidas'}`),
   shoutOwn: 'Filha da putinha!',
   shoutOwnHint: 'Descarta uma carta sua igual.',
@@ -195,6 +223,7 @@ export const T = {
   total: 'Soma',
   winnerBadge: 'Menor soma',
   backToLobby: 'Voltar ao início',
+  backToRoom: 'Voltar para a sala',
 
   // connection
   status: {
@@ -203,8 +232,18 @@ export const T = {
     connected: 'Conectado',
     reconnecting: 'Reconectando…',
     disconnected: 'Sem conexão',
+    replaced: 'Partida aberta em outro lugar',
   } satisfies Record<ConnectionStatus, string>,
+  retry: 'Tentar de novo',
   dismiss: 'Fechar aviso',
+  genericError: 'Algo deu errado. Tente de novo.',
+  sessionLost: 'Não deu para voltar à partida: ela acabou ou você saiu dela.',
+  splashConnecting: 'Conectando ao servidor…',
+  splashTable: 'Preparando a mesa…',
+  replacedTitle: 'Você abriu esta partida em outro lugar',
+  replacedHint: 'Outra aba ou aparelho assumiu o seu lugar na mesa. Só um pode jogar de cada vez.',
+  replacedTakeBack: 'Jogar aqui',
+  replacedHome: 'Ir para o início',
 
   // demo
   demoButton: 'Demo',
@@ -236,16 +275,68 @@ const GAME_ERROR_TEXT: Record<ErrorCode, string> = {
   END_ALREADY_CALLED: 'Alguém já falou “Estou foda”.',
 };
 
-const LOBBY_ERROR_TEXT: Record<LobbyErrorCode, string> = {
+const PROTOCOL_ERROR_TEXT: Record<ProtocolErrorCode, string> = {
+  BAD_REQUEST: 'O servidor não entendeu o pedido. Confira os dados e tente de novo.',
+  UNKNOWN_EVENT: 'O servidor não reconheceu esse pedido. Atualize a página.',
+  RATE_LIMITED: 'Muitos pedidos seguidos. Espere um pouco e tente de novo.',
+  INTERNAL_ERROR: 'Deu um problema no servidor. Tente de novo.',
+  INVALID_SESSION: 'Não deu para voltar à partida: ela acabou ou você saiu dela.',
+  NOT_IN_ROOM: 'Você não está mais nesta sala.',
+  ALREADY_IN_ROOM: 'Você já está numa sala. Saia dela antes de entrar em outra.',
   ROOM_NOT_FOUND: 'Não achamos uma sala com esse código. Confira e tente de novo.',
   ROOM_FULL: 'Essa sala está cheia.',
-  GAME_ALREADY_STARTED: 'A partida dessa sala já começou.',
+  ROOM_IN_GAME: 'A partida dessa sala já começou. Espere ela acabar para entrar.',
+  ROOM_LIMIT: 'Salas demais abertas agora. Saia de uma sala ou tente mais tarde.',
   NOT_HOST: 'Só o anfitrião pode fazer isso.',
-  INVALID_NAME: 'Escolha um nome para entrar na mesa.',
-  NOT_CONNECTED: 'Sem conexão com o servidor. Tente de novo em instantes.',
+  NOT_ENOUGH_PLAYERS: 'Faltam jogadores para começar. Chame alguém ou adicione um bot.',
+  NOT_A_BOT: 'Só dá para tirar bots da sala.',
+  NO_GAME: 'Não tem partida rolando nesta sala.',
+  GAME_IN_PROGRESS: 'Não dá para mudar a sala durante a partida.',
 };
 
-export function errorText(error: ConnectionError): string {
-  if (error.code in GAME_ERROR_TEXT) return GAME_ERROR_TEXT[error.code as ErrorCode];
-  return LOBBY_ERROR_TEXT[error.code as LobbyErrorCode] ?? T.status.disconnected;
+const CLIENT_ERROR_TEXT: Record<ClientErrorCode, string> = {
+  NOT_CONNECTED: 'Sem conexão com o servidor. Tente de novo em instantes.',
+  TIMEOUT: 'O servidor demorou para responder. Tente de novo.',
+  INVALID_NAME: 'Escolha um nome para entrar na mesa.',
+  INVALID_CODE: 'Esse código não parece certo. Confira as letras e os números.',
+  SERVER_FULL: 'O servidor está lotado agora. Tente daqui a pouco.',
+  TOO_MANY_CONNECTIONS: 'Muitas conexões abertas daqui. Feche outras abas do jogo e tente de novo.',
+};
+
+/** The same code reads differently depending on what was asked. */
+const REQUEST_ERROR_TEXT: Partial<Record<RequestName, Partial<Record<ConnectionErrorCode, string>>>> = {
+  'room:join': {
+    RATE_LIMITED: 'Muitas tentativas. Espere alguns minutos.',
+    BAD_REQUEST: 'Confira o código da sala e o seu nome.',
+  },
+  'room:create': { BAD_REQUEST: 'Confira o seu nome.' },
+  'room:quickPlay': {
+    ROOM_FULL: 'Bots demais para uma mesa. Escolha menos bots.',
+    BAD_REQUEST: 'Confira o seu nome e a quantidade de bots.',
+  },
+  'room:addBot': { ROOM_FULL: 'A mesa já está cheia.' },
+  'session:resume': { RATE_LIMITED: 'Não deu para voltar à partida agora. Espere um pouco.' },
+  'game:action': {
+    RATE_LIMITED: 'Calma! Jogadas demais seguidas. Espere um instante.',
+    BAD_REQUEST: 'O servidor não entendeu essa jogada.',
+    NOT_IN_ROOM: 'Você não está mais nesta partida.',
+  },
+};
+
+const ALL_ERROR_TEXT: Record<ConnectionErrorCode, string> = {
+  ...GAME_ERROR_TEXT,
+  ...PROTOCOL_ERROR_TEXT,
+  ...CLIENT_ERROR_TEXT,
+};
+
+/** Portuguese text for any refusal, from its code (never from the server's English message). */
+export function errorText(error: Pick<ConnectionError, 'code' | 'request'>): string {
+  return REQUEST_ERROR_TEXT[error.request]?.[error.code] ?? ALL_ERROR_TEXT[error.code] ?? T.genericError;
 }
+
+export const ROOM_CLOSED_TEXT: Record<RoomClosedReason, string> = {
+  idle: 'A sala fechou por falta de atividade.',
+  empty: 'A sala fechou porque ficou sem ninguém.',
+  shutdown: 'O servidor foi reiniciado e a sala fechou. Crie outra para continuar.',
+  error: 'A sala fechou por um erro no servidor. Desculpe! Crie outra para continuar.',
+};

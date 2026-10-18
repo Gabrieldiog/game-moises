@@ -22,7 +22,9 @@ export const DEMO_SERVER = {
   players: { min: 2, max: 6 },
   deckSize: 54,
   gridSize: 4,
-  timings: { arrangeMs: 5_000, initialPeekMs: 5_000, reactionWindowMs: 3_000, revealMs: 3_000 },
+  timings: { arrangeMs: 5_000, initialPeekMs: 5_000, reactionWindowMs: 3_000, revealMs: 3_000, turnMs: 30_000 },
+  /** Cards the black K shows (the server sends it as TurnView.powerTargetCount). */
+  powers: { peekManyCount: 2 },
 } as const;
 
 /** Arbitrary fixed server clock for fixtures (the client derives its offset from `now`). */
@@ -123,9 +125,15 @@ function turn(playerId: PlayerId, number: number, patch: Partial<TurnView> = {})
     hasDrawnCard: false,
     drawnCard: null,
     pendingPower: null,
+    powerTargetCount: null,
     peeked: [],
     ...patch,
   };
+}
+
+/** What the server would publish as TurnView.powerTargetCount for a pending power. */
+function targetCount(power: PowerKind): number {
+  return power === 'peekManyAndSwap' ? DEMO_SERVER.powers.peekManyCount : 1;
 }
 
 function base(ctx: Ctx): GameView {
@@ -153,7 +161,7 @@ function midGame(ctx: Ctx, turnsPlayed: number, discardTop: Card): GameView {
 function powerScene(ctx: Ctx, power: PowerKind, discarded: Card): GameView {
   return {
     ...midGame(ctx, 6, discarded),
-    turn: turn(ctx.ids[0] ?? 's0', 6, { step: 'power', pendingPower: power }),
+    turn: turn(ctx.ids[0] ?? 's0', 6, { step: 'power', pendingPower: power, powerTargetCount: targetCount(power) }),
   };
 }
 
@@ -171,6 +179,7 @@ function peekSwapScene(ctx: Ctx, power: PowerKind, discarded: Card, peeked: read
     turn: turn(ctx.ids[0] ?? 's0', 6, {
       step: 'powerSwap',
       pendingPower: power,
+      powerTargetCount: targetCount(power),
       peeked: peeked.map(([ref]) => ref),
     }),
   };
@@ -280,6 +289,17 @@ const SCENES: Record<ScenarioId, (ctx: Ctx) => GameView> = {
 
 export function buildScenario(id: ScenarioId, options: ScenarioOptions): GameView {
   return SCENES[id](context(options));
+}
+
+/**
+ * The GameUpdate.turnDeadline the server would send with a scene: while the
+ * current player has a decision to make (not during a reaction window), each
+ * decision gets turnMs.
+ */
+export function scenarioTurnDeadline(view: GameView, options: Pick<ScenarioOptions, 'timeScale'> = {}): number | null {
+  if (view.phase !== 'playing' || view.turn === null || view.reactionWindow !== null || view.turn.step === 'reaction') return null;
+  const scale = options.timeScale && options.timeScale > 0 ? options.timeScale : 1;
+  return view.now + Math.round(DEMO_SERVER.timings.turnMs * scale);
 }
 
 /**

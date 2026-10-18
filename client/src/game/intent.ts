@@ -32,11 +32,16 @@ const POWER_POLICY: Record<PowerKind, PickPolicy> = {
   peekOpponent: { own: 0, opponents: 1, onlyRefs: null },
   blindSwap: { own: 1, opponents: 1, onlyRefs: null },
   peekAndSwap: { own: 0, opponents: 1, onlyRefs: null },
-  // How many cards the black K shows is a server rule that the view does not
-  // carry yet; the client only caps at the protocol limit and the server
-  // answers WRONG_TARGET_COUNT if the number is not right.
+  // How many cards the black K shows is a server rule: it comes in
+  // TurnView.powerTargetCount (see pickPolicy). Without it, the client only
+  // caps at the protocol limit and the server answers WRONG_TARGET_COUNT.
   peekManyAndSwap: { own: 0, opponents: PROTOCOL_LIMITS.maxPowerTargets, onlyRefs: null },
 };
+
+/** Opponent cards the black K must name: the server's number when the view has it. */
+export function peekManyTargets(targetCount: number | null): number {
+  return targetCount !== null && targetCount > 0 ? targetCount : PROTOCOL_LIMITS.maxPowerTargets;
+}
 
 export function pickPolicy(ctx: UiContext, shout: Shout | null): PickPolicy {
   switch (ctx.kind) {
@@ -45,7 +50,9 @@ export function pickPolicy(ctx: UiContext, shout: Shout | null): PickPolicy {
     case 'myDecide':
       return { own: 1, opponents: 0, onlyRefs: null };
     case 'myPower':
-      return POWER_POLICY[ctx.power];
+      return ctx.power === 'peekManyAndSwap'
+        ? { ...POWER_POLICY.peekManyAndSwap, opponents: peekManyTargets(ctx.targetCount) }
+        : POWER_POLICY[ctx.power];
     case 'myPowerSwap':
       return { own: 1, opponents: 1, onlyRefs: ctx.peeked };
     case 'reaction':
@@ -98,7 +105,12 @@ export function swapWithDrawnAction(picks: Picks): Action | null {
   return slot === undefined ? null : { type: 'swapWithDrawn', slot };
 }
 
-export function usePowerAction(power: PowerKind, picks: Picks): Action | null {
+/**
+ * The usePower action for the selected cards, or null while the selection is
+ * incomplete. For the black K, `targetCount` (TurnView.powerTargetCount) says
+ * how many cards the server expects; the button waits for exactly that many.
+ */
+export function usePowerAction(power: PowerKind, picks: Picks, targetCount: number | null = null): Action | null {
   const own = picks.own[0];
   const target = picks.opponents[0];
   switch (power) {
@@ -113,7 +125,7 @@ export function usePowerAction(power: PowerKind, picks: Picks): Action | null {
     case 'peekAndSwap':
       return target === undefined ? null : { type: 'usePower', power, target: { ...target } };
     case 'peekManyAndSwap':
-      return picks.opponents.length === 0
+      return picks.opponents.length === 0 || (targetCount !== null && targetCount > 0 && picks.opponents.length !== targetCount)
         ? null
         : { type: 'usePower', power, targets: picks.opponents.map((ref) => ({ ...ref })) };
   }
