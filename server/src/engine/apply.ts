@@ -20,11 +20,10 @@ import {
   gameError,
   getPlayer,
   isValidTime,
-  opponentCardCount,
   openReactionWindow,
   othersAfter,
+  powerTargetCount,
   tickDraft,
-  triggerEndIfOutOfCards,
 } from './internal.js';
 import type { Draft, EngineResult, GameState, PlayerState, TurnState } from './types.js';
 
@@ -221,7 +220,7 @@ function usePower(d: Draft, me: PlayerId, action: UsePowerAction): GameError | n
     case 'peekAndSwap':
       return peekThenOfferSwap(d, me, turn, [action.target]);
     case 'peekManyAndSwap': {
-      const required = Math.min(s.rules.powers.peekManyCount, opponentCardCount(s, me));
+      const required = powerTargetCount(s, action.power, me);
       if (action.targets.length !== required) {
         return gameError('WRONG_TARGET_COUNT', `choose exactly ${required} opponent card(s)`);
       }
@@ -293,6 +292,7 @@ function requireReactionWindow(d: Draft, me: PlayerId): GameError | null {
 function matchOwn(d: Draft, me: PlayerId, slot: number): GameError | null {
   const windowError = requireReactionWindow(d, me);
   if (windowError) return windowError;
+  if (!d.s.rules.reactions.matchOwn) return gameError('REACTION_DISABLED', 'matchOwn is switched off for this game');
   const s = d.s;
   const reaction = s.reaction as NonNullable<GameState['reaction']>;
   const player = getPlayer(s, me);
@@ -305,7 +305,6 @@ function matchOwn(d: Draft, me: PlayerId, slot: number): GameError | null {
     player.grid[slot] = null;
     discard(d, card);
     d.events.push({ type: 'reactionSucceeded', reaction: 'matchOwn', playerId: me, slot, card: publicCard(card) });
-    triggerEndIfOutOfCards(d, me);
     closeReactionWindow(d, 'matched'); // only the first right reaction counts
     return null;
   }
@@ -318,6 +317,9 @@ function matchOwn(d: Draft, me: PlayerId, slot: number): GameError | null {
 function matchOpponent(d: Draft, me: PlayerId, target: SlotRef, giveSlot: number): GameError | null {
   const windowError = requireReactionWindow(d, me);
   if (windowError) return windowError;
+  if (!d.s.rules.reactions.matchOpponent) {
+    return gameError('REACTION_DISABLED', 'matchOpponent is switched off for this game');
+  }
   const s = d.s;
   const reaction = s.reaction as NonNullable<GameState['reaction']>;
   const targetError = checkOpponentTarget(s, me, target);
@@ -343,7 +345,6 @@ function matchOpponent(d: Draft, me: PlayerId, target: SlotRef, giveSlot: number
       giveSlot,
       card: publicCard(theirs),
     });
-    triggerEndIfOutOfCards(d, me);
     closeReactionWindow(d, 'matched');
     return null;
   }

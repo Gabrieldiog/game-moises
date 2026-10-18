@@ -65,6 +65,19 @@ describe('rooms over Socket.IO', () => {
     expect(rb.rooms().at(-1)?.you).toBe(guest.playerId);
   });
 
+  it('room:setTable validates the payload, is host-only and shows up in room:state', async () => {
+    const { url } = await startServer();
+    const { a, b } = await createAndJoin(url);
+    const table = { turnSeconds: 30, reactions: { matchOwn: false, matchOpponent: true }, powers: ['Q' as const] };
+    expect(errorCode(await b.emitWithAck('room:setTable', table))).toBe('NOT_HOST');
+    expect(errorCode(await emitRaw(a, 'room:setTable', { ...table, turnSeconds: 1 }))).toBe('BAD_REQUEST');
+    expect(errorCode(await emitRaw(a, 'room:setTable', { ...table, extra: true }))).toBe('BAD_REQUEST');
+    expect(errorCode(await emitRaw(a, 'room:setTable', null))).toBe('BAD_REQUEST');
+    const changed = waitFor<RoomView>(b, 'room:state', (r) => r.table.turnSeconds === 30);
+    ok(await a.emitWithAck('room:setTable', table));
+    expect((await changed).table).toEqual(table);
+  });
+
   it('sanitizes names and refuses bad ones', async () => {
     const { url } = await startServer();
     const a = await connect(url);
@@ -92,14 +105,15 @@ describe('rooms over Socket.IO', () => {
     expect(errorCode(await emitRaw(a, 'room:quickPlay', { name: 'Ana', bots: 9 }))).toBe('ALREADY_IN_ROOM');
   });
 
-  it('refuses joining a game in progress, unknown codes and full rooms', async () => {
+  it('queues a join to a game in progress; refuses unknown codes and full rooms', async () => {
     const { url } = await startServer();
     const { a, host } = await createAndJoin(url);
     const c = await connect(url);
     expect(errorCode(await c.emitWithAck('room:join', { code: 'ZZZZZZ', name: 'Caio' }))).toBe('ROOM_NOT_FOUND');
     const roomCode = host.room.code;
     ok(await a.emitWithAck('room:start', {}));
-    expect(errorCode(await c.emitWithAck('room:join', { code: roomCode, name: 'Caio' }))).toBe('ROOM_IN_GAME');
+    const queued = ok(await c.emitWithAck('room:join', { code: roomCode, name: 'Caio' }));
+    expect(queued.room.queue.map((q) => q.name)).toEqual(['Caio']);
     const d = await connect(url);
     expect(errorCode(await d.emitWithAck('room:quickPlay', { name: 'Davi', bots: 6 }))).toBe('ROOM_FULL');
   });

@@ -62,6 +62,25 @@ export function powerIsUsable(s: GameState, power: PowerKind, playerId: PlayerId
   }
 }
 
+/**
+ * How many targets `usePower` must name for `power` right now. Single source of
+ * truth: `applyAction` checks the action against it (WRONG_TARGET_COUNT) and
+ * `viewFor` publishes it as `TurnView.powerTargetCount`.
+ * peekManyAndSwap asks for `peekManyCount` opponent cards, limited to what is
+ * on the table; every other power takes exactly one pick.
+ */
+export function powerTargetCount(s: GameState, power: PowerKind, playerId: PlayerId): number {
+  switch (power) {
+    case 'peekManyAndSwap':
+      return Math.min(s.rules.powers.peekManyCount, opponentCardCount(s, playerId));
+    case 'peekOwn':
+    case 'peekOpponent':
+    case 'blindSwap':
+    case 'peekAndSwap':
+      return 1;
+  }
+}
+
 // --- piles -------------------------------------------------------------------
 
 /**
@@ -107,6 +126,11 @@ export function startTurn(d: Draft, playerId: PlayerId): void {
 
 export function openReactionWindow(d: Draft, card: Card, openedBy: PlayerId): void {
   const s = d.s;
+  if (!s.rules.reactions.matchOwn && !s.rules.reactions.matchOpponent) {
+    // No reaction is possible at this table: skip the window altogether.
+    continueAfterReaction(d);
+    return;
+  }
   const deadline = d.now + s.rules.timings.reactionWindowMs;
   s.reaction = { card: publicCard(card), openedBy, deadline, attempts: [] };
   if (s.turn) s.turn.step = 'reaction';
@@ -118,6 +142,11 @@ export function closeReactionWindow(d: Draft, reason: 'timeout' | 'matched'): vo
   const s = d.s;
   s.reaction = null;
   d.events.push({ type: 'reactionWindowClosed', reason });
+  continueAfterReaction(d);
+}
+
+function continueAfterReaction(d: Draft): void {
+  const s = d.s;
   const turn = s.turn;
   if (s.phase !== 'playing' || !turn) return;
   const power = turn.pendingPower;
@@ -167,15 +196,6 @@ export function othersAfter(s: GameState, playerId: PlayerId): PlayerId[] {
     ids.push((s.players[(start + step) % s.players.length] as PlayerState).id);
   }
   return ids;
-}
-
-/** A player with no cards left triggers the end as if they had said "Estou foda". */
-export function triggerEndIfOutOfCards(d: Draft, playerId: PlayerId): void {
-  const s = d.s;
-  if (s.endCall || s.phase !== 'playing') return;
-  if (countCards(getPlayer(s, playerId).grid) > 0) return;
-  s.endCall = { callerId: playerId, reason: 'noCards', pending: othersAfter(s, playerId) };
-  d.events.push({ type: 'endCalled', playerId, reason: 'noCards' });
 }
 
 export function finishGame(d: Draft, reason: GameOverReason): void {

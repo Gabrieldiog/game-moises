@@ -130,7 +130,8 @@ describe('host controls', () => {
     expect(transport.last('s1', 'room:state')?.status).toBe('playing');
     expect(transport.last('s1', 'game:update')?.view.you).toBe(host.playerId);
     expect(transport.last('s2', 'game:update')?.view.you).toBe(guest.playerId);
-    expect(code(rooms.joinRoom('s3', roomCode, 'Caio'))).toBe('ROOM_IN_GAME');
+    // a mid-game arrival is queued, not refused
+    expect(data(rooms.joinRoom('s3', roomCode, 'Caio')).room.status).toBe('playing');
     expect(code(rooms.addBot('s1'))).toBe('GAME_IN_PROGRESS');
     expect(code(rooms.removeBot('s1', 'x'))).toBe('GAME_IN_PROGRESS');
   });
@@ -252,15 +253,50 @@ describe('sessions and reconnection', () => {
     expect(room?.members.map((m) => m.id)).toEqual([guest.playerId]);
   });
 
-  it('leaving during a game keeps the seat (covered by the timer) until the game ends', () => {
-    const { rooms, transport, host, roomCode } = lobby();
+  it('leaving during a game: a bot takes the same seat and plays with its view', () => {
+    const { rooms, transport, clock, host, roomCode } = lobby();
     data(rooms.start('s1'));
     data(rooms.leave('s1'));
     rooms.flush();
     const members = transport.last('s2', 'room:state')?.members ?? [];
-    expect(members.find((m) => m.id === host.playerId)).toMatchObject({ connected: false });
-    expect(rooms.inspect(roomCode)?.members.find((m) => m.id === host.playerId)?.left).toBe(true);
+    expect(members.find((m) => m.id === host.playerId)).toMatchObject({ isBot: true, connected: true, isHost: false });
+    expect(rooms.inspect(roomCode)?.session?.botFor(host.playerId)).toBeDefined();
+    expect(transport.last('s2', 'game:update')?.view.players.map((p) => p.id)).toContain(host.playerId);
     expect(code(rooms.resume('s9', host.token))).toBe('INVALID_SESSION');
+    // the bot actually plays: after enough time it has acted
+    const session = rooms.inspect(roomCode)?.session;
+    for (let i = 0; i < 40; i++) clock.advance(1_000);
+    expect((session?.stats.botActions ?? 0)).toBeGreaterThan(0);
+  });
+
+  it('players who arrive mid-game wait in the queue and become players of the next game', () => {
+    const { rooms, transport, clock, roomCode } = lobby();
+    data(rooms.start('s1'));
+    const late = data(rooms.joinRoom('s3', roomCode, 'Caio'));
+    rooms.flush();
+    expect(late.room.members).toHaveLength(2);
+    expect(late.room.queue).toEqual([{ id: late.playerId, name: 'Caio', connected: true }]);
+    expect(transport.last('s1', 'room:state')?.queue.map((q) => q.name)).toEqual(['Caio']);
+    // the queued one spectates and cannot act
+    expect(transport.last('s3', 'game:update')?.view.you).toBeNull();
+    expect(code(rooms.act('s3', { type: 'callEnd' }))).toBe('UNKNOWN_PLAYER');
+    expect(code(rooms.removeBot('s1', late.playerId))).toBe('GAME_IN_PROGRESS');
+    // the queue is bounded by the number of seats
+    for (let i = 4; i < 4 + RULES.players.max - 1; i++) data(rooms.joinRoom(`s${i}`, roomCode, `P${i}`));
+    expect(code(rooms.joinRoom('s99', roomCode, 'X'))).toBe('ROOM_FULL');
+    // finish the game: the host calls the end; timers and bots play the rest
+    for (let i = 0; i < 2_000 && rooms.inspect(roomCode)?.status === 'playing'; i++) {
+      clock.advance(1_000);
+      rooms.act('s1', { type: 'callEnd' });
+    }
+    rooms.flush();
+    const after = transport.last('s1', 'room:state');
+    expect(after?.status).toBe('ended');
+    // 2 players + 4 free seats are taken in arrival order; the other 2 keep waiting
+    expect(after?.members.map((m) => m.name)).toEqual(['Ana', 'Bia', 'Caio', 'P4', 'P5', 'P6']);
+    expect(after?.queue.map((q) => q.name)).toEqual(['P7', 'P8']);
+    data(rooms.start('s1'));
+    expect(rooms.inspect(roomCode)?.session?.internalState.players.map((p) => p.name)).toEqual(['Ana', 'Bia', 'Caio', 'P4', 'P5', 'P6']);
   });
 
   it('closes the room when the last human leaves', () => {

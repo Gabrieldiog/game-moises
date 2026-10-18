@@ -16,5 +16,7 @@ export function botKnowledge(rules: RulesConfig): BotKnowledge {
     sameRank: (a, b) => sameRank(a, b, rules),
     peekManyCount: rules.powers.peekManyCount,
     unknownCardValue: average,
+    matchOwnEnabled: rules.reactions.matchOwn,
+    matchOpponentEnabled: rules.reactions.matchOpponent,
   };
 }

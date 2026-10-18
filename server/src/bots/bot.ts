@@ -25,6 +25,9 @@ export interface BotKnowledge {
   readonly peekManyCount: number;
   /** Expected value of a card the bot knows nothing about (deck average). */
   readonly unknownCardValue: number;
+  /** Table settings: reaction kinds the bot may try (default: both). */
+  readonly matchOwnEnabled?: boolean;
+  readonly matchOpponentEnabled?: boolean;
 }
 
 export interface BotTuning {
@@ -176,9 +179,10 @@ export class Bot {
         shed = known;
       }
     }
-    if (shed) return { type: 'matchOwn', slot: shed.slot };
+    if (shed && this.rules.matchOwnEnabled !== false) return { type: 'matchOwn', slot: shed.slot };
 
     // "Filho da puta": take a known opponent card of the same rank and give away my worst card.
+    if (this.rules.matchOpponentEnabled === false) return null;
     const give = this.worstOwn(me);
     if (!give || give.value <= 0) return null;
     for (const opponent of this.opponents(view)) {

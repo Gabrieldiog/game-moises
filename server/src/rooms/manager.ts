@@ -1,17 +1,21 @@
-import type {
-  Action,
-  GameUpdate,
-  JoinedRoom,
-  PlayerId,
-  ResumedSession,
-  RoomClosed,
-  RoomClosedReason,
-  RoomStatus,
-  RoomView,
-  ServerErrorCode,
+import {
+  RANKS,
+  type Action,
+  type GameUpdate,
+  type JoinedRoom,
+  type PlayerId,
+  type Rank,
+  type ResumedSession,
+  type RoomClosed,
+  type RoomClosedReason,
+  type RoomStatus,
+  type RoomView,
+  type ServerErrorCode,
+  type SetTableSettingsPayload,
+  type TableSettingsView,
 } from '@moises/shared';
 import type { ServerConfig } from '../config/env.js';
-import type { RulesConfig } from '../config/rules.js';
+import { type RulesConfig } from '../config/rules.js';
 import { generateSeed } from '../engine/index.js';
 import { GameSession } from '../game/session.js';
 import { hashToken, newPlayerId, newRoomCode, newSessionToken } from '../util/ids.js';
@@ -68,13 +72,14 @@ export type Outcome<T> = { readonly ok: true; readonly data: T } | { readonly ok
 interface Member {
   readonly id: PlayerId;
   readonly name: string;
-  readonly isBot: boolean;
+  /** Becomes true when a human leaves during a game (a bot takes the seat). */
+  isBot: boolean;
   /** SHA-256 of the session token (humans). The raw token is never stored. */
   tokenHash: string | null;
   socketId: string | null;
   disconnectedAt: number | null;
-  /** Left during a game: stays seated (the turn timer plays for them) and cannot come back. */
-  left: boolean;
+  /** Joined while a game was running: waits for the next game (spectates meanwhile). */
+  queued: boolean;
 }
 
 interface Room {
@@ -83,6 +88,8 @@ interface Room {
   /** Insertion order is the seat order. */
   readonly members: Map<PlayerId, Member>;
   hostId: PlayerId;
+  /** Table settings chosen by the host; the rules of the next game. */
+  table: TableSettings;
   session: GameSession | null;
   lastActivityAt: number;
   /** Since when no human is connected (null while someone is). */
@@ -91,6 +98,14 @@ interface Room {
   /** Session version already sent to clients. */
   sentVersion: number;
   lastStatus: RoomStatus;
+}
+
+interface TableSettings {
+  turnMs: number;
+  matchOwn: boolean;
+  matchOpponent: boolean;
+  /** Ranks whose power is on. */
+  powers: ReadonlySet<Rank>;
 }
 
 interface Binding {
@@ -188,9 +203,13 @@ export class RoomManager {
     if (this.bindings.has(socketId)) return fail('ALREADY_IN_ROOM');
     const room = this.rooms.get(code);
     if (!room) return fail('ROOM_NOT_FOUND');
-    if (this.status(room) === 'playing') return fail('ROOM_IN_GAME');
-    if (this.seated(room).length >= this.rules.players.max) return fail('ROOM_FULL');
+    const playing = this.status(room) === 'playing';
+    // Mid-game arrivals wait in the queue (as many as there are seats) for the next game.
+    if (playing ? this.queue(room).length >= this.rules.players.max : this.seated(room).length >= this.rules.players.max) {
+      return fail('ROOM_FULL');
+    }
     const { member, token } = this.addHuman(room, name);
+    member.queued = playing;
     this.bind(socketId, room, member);
     this.touch(room);
     this.markDirty(room, true);
@@ -203,7 +222,7 @@ export class RoomManager {
     if (!seat) return fail('INVALID_SESSION');
     const room = this.rooms.get(seat.roomCode);
     const member = room?.members.get(seat.playerId);
-    if (!room || !member || member.left) {
+    if (!room || !member) {
       this.sessions.delete(hashToken(token));
       return fail('INVALID_SESSION');
     }
@@ -232,14 +251,21 @@ export class RoomManager {
     if (member.tokenHash) this.sessions.delete(member.tokenHash);
     member.tokenHash = null;
     member.socketId = null;
-    if (this.status(room) === 'playing') {
-      member.left = true;
-      member.disconnectedAt = this.deps.now();
+    if (this.status(room) === 'playing' && !member.queued) {
+      // The seat stays and a bot plays it from now on.
+      member.isBot = true;
+      member.disconnectedAt = null;
+      const session = room.session;
+      if (session && this.guard(room, () => session.replaceWithBot(member.id, this.deps.now())) === null) {
+        return ok(null); // room closed by guard
+      }
+      this.logger.info('human replaced by bot', { room: room.code });
     } else {
       room.members.delete(member.id);
     }
     this.markDirty(room, true);
     this.afterHumanGone(room);
+    if (this.rooms.get(room.code) === room) this.afterGameChange(room);
     return ok(null);
   }
 
@@ -248,7 +274,6 @@ export class RoomManager {
     if (!host.ok) return host;
     const room = host.data;
     if (this.status(room) === 'playing') return fail('GAME_IN_PROGRESS');
-    this.pruneLeft(room);
     if (this.seated(room).length >= this.rules.players.max) return fail('ROOM_FULL');
     this.addBotMember(room);
     this.markDirty(room, true);
@@ -261,7 +286,7 @@ export class RoomManager {
     const room = host.data;
     if (this.status(room) === 'playing') return fail('GAME_IN_PROGRESS');
     const target = room.members.get(botId);
-    if (!target || !target.isBot) return fail('NOT_A_BOT');
+    if (!target || !target.isBot || target.queued) return fail('NOT_A_BOT');
     room.members.delete(botId);
     this.markDirty(room, true);
     return ok(null);
@@ -272,11 +297,29 @@ export class RoomManager {
     if (!host.ok) return host;
     const room = host.data;
     if (this.status(room) === 'playing') return fail('GAME_IN_PROGRESS');
-    this.pruneLeft(room);
+    this.promoteQueue(room);
     const seated = this.seated(room).length;
     if (seated < this.rules.players.min) return fail('NOT_ENOUGH_PLAYERS');
     if (seated > this.rules.players.max) return fail('ROOM_FULL');
     this.startGame(room);
+    return ok(null);
+  }
+
+  /** The host sets the table settings (lobby or between games). Validated by TableSettingsSchema before; checked against the rules here. */
+  setTable(socketId: string, settings: SetTableSettingsPayload): Outcome<null> {
+    const host = this.hostContext(socketId);
+    if (!host.ok) return host;
+    const room = host.data;
+    if (this.status(room) === 'playing') return fail('GAME_IN_PROGRESS');
+    const available = new Set(this.basePowerRanks());
+    if (settings.powers.some((rank) => !available.has(rank))) return fail('BAD_REQUEST');
+    room.table = {
+      turnMs: settings.turnSeconds * 1000,
+      matchOwn: settings.reactions.matchOwn,
+      matchOpponent: settings.reactions.matchOpponent,
+      powers: new Set(settings.powers),
+    };
+    this.markDirty(room, true);
     return ok(null);
   }
 
@@ -375,7 +418,51 @@ export class RoomManager {
   }
 
   private seated(room: Room): Member[] {
-    return [...room.members.values()].filter((m) => !m.left);
+    return [...room.members.values()].filter((m) => !m.queued);
+  }
+
+  private queue(room: Room): Member[] {
+    return [...room.members.values()].filter((m) => m.queued);
+  }
+
+  /** Waiting players take the free seats, in arrival order (the rest keep waiting). */
+  private promoteQueue(room: Room): void {
+    let free = this.rules.players.max - this.seated(room).length;
+    for (const member of this.queue(room)) {
+      if (free <= 0) break;
+      member.queued = false;
+      free -= 1;
+      this.dirty.set(room, true);
+    }
+  }
+
+  private basePowerRanks(): Rank[] {
+    return RANKS.filter((rank) => this.rules.cards.powers[rank] !== undefined);
+  }
+
+  private defaultTable(): TableSettings {
+    return {
+      turnMs: this.rules.timings.turnMs,
+      matchOwn: this.rules.reactions.matchOwn,
+      matchOpponent: this.rules.reactions.matchOpponent,
+      powers: new Set(this.basePowerRanks()),
+    };
+  }
+
+  /** The rules of a game at this table: the server rules with the host's table settings applied. */
+  private tableRules(room: Room): RulesConfig {
+    const { table } = room;
+    const powers: RulesConfig['cards']['powers'] = {};
+    for (const rank of RANKS) {
+      const power = this.rules.cards.powers[rank];
+      if (power !== undefined && table.powers.has(rank)) powers[rank] = power;
+    }
+    return {
+      ...this.rules,
+      cards: { ...this.rules.cards, powers },
+      reactions: { ...this.rules.reactions, matchOwn: table.matchOwn, matchOpponent: table.matchOpponent },
+      timings: { ...this.rules.timings, turnMs: table.turnMs },
+    };
   }
 
   private lookup(socketId: string): { room: Room; member: Member } | null {
@@ -417,6 +504,7 @@ export class RoomManager {
       creatorIp: ip,
       members: new Map(),
       hostId: '',
+      table: this.defaultTable(),
       session: null,
       lastActivityAt: now,
       noHumanSince: null,
@@ -446,7 +534,7 @@ export class RoomManager {
       tokenHash: hashToken(token),
       socketId: null,
       disconnectedAt: null,
-      left: false,
+      queued: false,
     };
     room.members.set(member.id, member);
     this.sessions.set(member.tokenHash as string, { roomCode: room.code, playerId: member.id });
@@ -464,7 +552,7 @@ export class RoomManager {
       tokenHash: null,
       socketId: null,
       disconnectedAt: null,
-      left: false,
+      queued: false,
     };
     room.members.set(member.id, member);
     return member;
@@ -487,24 +575,16 @@ export class RoomManager {
     else room.noHumanSince ??= this.deps.now();
   }
 
-  /** Members who left during a game lose their seat once it is over. */
-  private pruneLeft(room: Room): void {
-    for (const member of [...room.members.values()]) {
-      if (member.left) {
-        room.members.delete(member.id);
-        this.dirty.set(room, true);
-      }
-    }
-  }
-
   /** After a human left or lost the seat: move the host, or close the room when no human is seated. */
   private afterHumanGone(room: Room): void {
-    const humans = [...room.members.values()].filter((m) => !m.isBot && !m.left);
+    const humans = [...room.members.values()].filter((m) => !m.isBot);
     if (humans.length === 0) {
       this.closeRoom(room, 'empty');
       return;
     }
-    if (!humans.some((m) => m.id === room.hostId)) room.hostId = (humans[0] as Member).id;
+    if (!humans.some((m) => m.id === room.hostId)) {
+      room.hostId = ((humans.find((m) => !m.queued) ?? humans[0]) as Member).id;
+    }
     this.updatePresence(room);
   }
 
@@ -512,7 +592,7 @@ export class RoomManager {
     const players = this.seated(room).map((m) => ({ id: m.id, name: m.name, isBot: m.isBot }));
     room.session = new GameSession({
       players,
-      rules: this.rules,
+      rules: this.tableRules(room),
       seed: this.deps.seed(),
       now: this.deps.now(),
       random: () => this.deps.random(),
@@ -541,7 +621,7 @@ export class RoomManager {
     if (status !== room.lastStatus) {
       if (status === 'ended') {
         this.logger.info('game ended', { room: room.code });
-        this.pruneLeft(room);
+        this.promoteQueue(room);
       }
       this.dirty.set(room, true);
     }
@@ -605,7 +685,7 @@ export class RoomManager {
       status: this.status(room),
       you,
       hostId: room.hostId,
-      members: [...room.members.values()].map((m) => ({
+      members: this.seated(room).map((m) => ({
         id: m.id,
         name: m.name,
         isBot: m.isBot,
@@ -615,8 +695,19 @@ export class RoomManager {
       settings: {
         minPlayers: this.rules.players.min,
         maxPlayers: this.rules.players.max,
-        turnMs: this.rules.timings.turnMs,
+        turnMs: room.table.turnMs,
       },
+      table: this.tableView(room),
+      queue: this.queue(room).map((m) => ({ id: m.id, name: m.name, connected: m.socketId !== null })),
+    };
+  }
+
+  private tableView(room: Room): TableSettingsView {
+    const { table } = room;
+    return {
+      turnSeconds: table.turnMs / 1000,
+      reactions: { matchOwn: table.matchOwn, matchOpponent: table.matchOpponent },
+      powers: RANKS.filter((rank) => table.powers.has(rank)),
     };
   }
 

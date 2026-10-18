@@ -1,0 +1,96 @@
+/*
+ * Visual tokens (colors, type, sizes). Purely visual constants, centralized
+ * here as the project rules allow. No game rule lives in CSS.
+ *
+ * Direction: "carteado debaixo da luminária". Seen from above: a dark room,
+ * an oval table with a wooden rail and textured felt, one warm lamp pool in
+ * the middle. All the loudness is spent on the shouts, printed like
+ * fluorescent street posters (lambe-lambe) in wood type.
+ */
+:root {
+  /* felt: change --feltro to recolor the whole table (texture is grayscale) */
+  --feltro: #1d5a3a;
+  --feltro-claro: color-mix(in oklab, var(--feltro), #fff3d6 16%);
+  --feltro-escuro: color-mix(in oklab, var(--feltro), #000 45%);
+
+  /* room and wood rail */
+  --sala: #120e0b;
+  --sala-luz: #2a2018;
+  --madeira: #5d4029;
+  --luz: rgb(255 226 168 / 0.3);
+
+  /* legacy names used by the lobby and panels */
+  --mesa: var(--feltro);
+  --mesa-luz: var(--feltro-claro);
+  --mesa-funda: var(--sala);
+  --mesa-borda: #0b0907;
+
+  /* where the textures live (public/textures, CC0 ambientCG) */
+  --tex-feltro: url('/textures/feltro.jpg');
+  --tex-madeira: url('/textures/madeira.jpg');
+
+  /* avatar colors, by seat */
+  --avatar-0: #c9a227;
+  --avatar-1: #b5523b;
+  --avatar-2: #4f7cac;
+  --avatar-3: #8a5fa8;
+  --avatar-4: #3f8f72;
+  --avatar-5: #c46d8e;
+
+  /* table shape: oval radius as horizontal / vertical */
+  --rail: clamp(10px, 2.8vw, 18px);
+  --oval: 50% / 17%;
+
+  /* paper and ink */
+  --papel: #f4eedd;
+  --papel-sombra: #e2d7bc;
+  --tinta: #000;
+  --sombra-carta: 0 1px 1px rgb(0 0 0 / 0.35), 0 6px 12px -3px rgb(0 0 0 / 0.55);
+  --texto: var(--papel);
+  --texto-suave: rgb(244 238 221 / 0.78);
+  --linha: rgb(244 238 221 / 0.2);
+
+  /* card back */
+  --vinho: #7a1d2c;
+
+  /* lambe-lambe fluorescents (always with black ink) */
+  --lambe-amarelo: #ffe14a;
+  --lambe-rosa: #ff5ca8;
+  --lambe-laranja: #ff8a2b;
+
+  /* king markers */
+  --k-vermelho: #d3122f;
+  --k-preto: #000;
+
+  /* type */
+  --font-display: 'Alfa Slab One', 'Rockwell', 'Roboto Slab', serif;
+  --font-ui: 'Archivo Variable', 'Archivo', system-ui, sans-serif;
+
+  /* shape */
+  --gutter: 16px;
+  --radius-btn: 12px;
+  --radius-poster: 3px;
+  --radius-tag: 8px;
+  --poster-shadow: 4px 4px 0 var(--tinta);
+  --touch: 44px;
+
+  /* card widths (height = width x 7/5). Opponent cards never go under the 44px touch target. */
+  --card-you: clamp(60px, min(21vw, 13svh), 124px);
+  --card-opp: clamp(44px, min(11vw, 6.6svh), 60px);
+  --card-pile: clamp(52px, min(15vw, 9.4svh), 92px);
+  --card-hand: clamp(58px, min(19vw, 11.6svh), 108px);
+  --card-end: 34px;
+
+  color-scheme: dark;
+}
+
+@media (min-width: 900px) and (min-aspect-ratio: 5/4) {
+  :root {
+    --oval: 22% / 50%;
+    --card-you: clamp(64px, 9.6svh, 124px);
+    --card-opp: clamp(44px, 4.9svh, 64px);
+    --card-pile: clamp(52px, 8.6svh, 96px);
+    --card-hand: clamp(58px, 11.6svh, 112px);
+    --card-end: 40px;
+  }
+}

@@ -1,6 +1,6 @@
 import type { Card, GameView, PlayerId, PlayerView, SlotView } from '@moises/shared';
 import { publicCard, sameCard } from './cards.js';
-import { countCards } from './internal.js';
+import { countCards, powerTargetCount } from './internal.js';
 import { tick } from './tick.js';
 import type { GameState, Slot } from './types.js';
 
@@ -47,6 +47,7 @@ export function viewFor(state: GameState, viewerId: PlayerId, now: number): Game
           hasDrawnCard: turn.drawnCard !== null,
           drawnCard: turn.drawnCard && you !== null && turn.playerId === you ? publicCard(turn.drawnCard) : null,
           pendingPower: turn.pendingPower,
+          powerTargetCount: turn.pendingPower ? powerTargetCount(s, turn.pendingPower, turn.playerId) : null,
           peeked: turn.peeked.map((ref) => ({ playerId: ref.playerId, slot: ref.slot })),
         }
       : null,
@@ -56,6 +57,11 @@ export function viewFor(state: GameState, viewerId: PlayerId, now: number): Game
           openedBy: s.reaction.openedBy,
           deadline: s.reaction.deadline,
           attemptedBy: [...new Set(s.reaction.attempts)],
+          attemptsPerPlayer: s.rules.reactions.attemptsPerWindow,
+          yourAttemptsLeft:
+            you === null
+              ? null
+              : Math.max(0, s.rules.reactions.attemptsPerWindow - s.reaction.attempts.filter((id) => id === you).length),
         }
       : null,
     discardTop: top ? publicCard(top) : null,

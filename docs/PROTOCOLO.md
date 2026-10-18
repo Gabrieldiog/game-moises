@@ -56,13 +56,14 @@ if (res.ok) {
 | Evento | Payload | `data` do ack | Erros específicos |
 |---|---|---|---|
 | `room:create` | `{ name }` | `JoinedRoom` | `ALREADY_IN_ROOM`, `ROOM_LIMIT` |
-| `room:join` | `{ code, name }` | `JoinedRoom` | `ALREADY_IN_ROOM`, `ROOM_NOT_FOUND`, `ROOM_IN_GAME`, `ROOM_FULL` |
+| `room:join` | `{ code, name }` | `JoinedRoom` | `ALREADY_IN_ROOM`, `ROOM_NOT_FOUND`, `ROOM_FULL` (partida em andamento: entra na fila, `RoomView.queue`) |
 | `room:quickPlay` | `{ name, bots }` | `JoinedRoom` (sala já em jogo) | `ALREADY_IN_ROOM`, `ROOM_LIMIT`, `ROOM_FULL` |
 | `session:resume` | `{ token }` | `ResumedSession` | `INVALID_SESSION`, `ALREADY_IN_ROOM` |
 | `room:leave` | `{}` | `null` | `NOT_IN_ROOM` |
 | `room:addBot` | `{}` | `null` | `NOT_IN_ROOM`, `NOT_HOST`, `GAME_IN_PROGRESS`, `ROOM_FULL` |
 | `room:removeBot` | `{ playerId }` | `null` | `NOT_IN_ROOM`, `NOT_HOST`, `GAME_IN_PROGRESS`, `NOT_A_BOT` |
 | `room:start` | `{}` | `null` | `NOT_IN_ROOM`, `NOT_HOST`, `GAME_IN_PROGRESS`, `NOT_ENOUGH_PLAYERS` |
+| `room:setTable` | `{ turnSeconds (int 5–60), reactions: { matchOwn, matchOpponent }, powers: Rank[] }` | `null` | `NOT_IN_ROOM`, `NOT_HOST`, `GAME_IN_PROGRESS`, `BAD_REQUEST` (também para rank sem poder nas regras do servidor) |
 | `game:action` | uma `Action` | `null` | `NOT_IN_ROOM`, `NO_GAME`, códigos do motor |
 
 Qualquer evento pode responder também `BAD_REQUEST`, `RATE_LIMITED`, `INTERNAL_ERROR`; um nome de evento fora da lista responde `UNKNOWN_EVENT`.
@@ -113,6 +114,8 @@ Recusas do motor voltam com o código de `shared/src/errors.ts`: `NOT_YOUR_TURN`
   hostId: PlayerId,
   members: [{ id, name, isBot, isHost, connected }], // ordem dos lugares na próxima partida
   settings: { minPlayers, maxPlayers, turnMs },
+  table: { turnSeconds, reactions: { matchOwn, matchOpponent }, powers: Rank[] }, // configurações da mesa (padrão 15 s, tudo ligado)
+  queue: [{ id, name, connected }], // chegaram com a partida em andamento; viram jogadores na próxima (e assistem como espectadores)
 }
 ```
 
@@ -129,6 +132,7 @@ Nunca contém cartas nem tokens. Em `ended` a sala funciona como lobby: o anfitr
 ```
 
 - Cada socket recebe **apenas** `viewFor(estado, seuJogador, agora)`. Uma carta escondida nunca aparece em mensagem nenhuma: só a carta comprada (para quem comprou), as cartas vistas por poder (para quem viu, até `until`), a espiada inicial (dono), cartas reveladas a todos após reação errada, o descarte e, no fim, todas.
+- **Poder pendente** (`view.turn`): `pendingPower` é público (a carta descartada está virada para cima). `powerTargetCount` diz quantas cartas o jogador da vez deve escolher no `usePower` desse poder, para o cliente não repetir número de regra: `targets.length` no `peekManyAndSwap` (`rules.powers.peekManyCount`, limitado às cartas de oponentes que ainda estão na mesa, o mesmo cálculo que o motor usa para recusar com `WRONG_TARGET_COUNT`) e `1` nos poderes de uma escolha só; `null` quando não há poder pendente. O valor só é definitivo com `turn.step === 'power'` (durante a janela de reação a mesa ainda pode mudar). É informação pública: deriva só de contagens de cartas, nunca de faces.
 - `events` são públicos (iguais para todos) e servem para animações e histórico. Além dos eventos do motor (`shared/src/events.ts`), existe `{ type: 'turnTimedOut', playerId, turnNumber, step }`.
 - Logo após `session:resume`, chega um `game:update` com `events: []` (retrato completo).
 - **Relógio**: todos os prazos (`turnDeadline`, `view.phaseDeadline`, `reactionWindow.deadline`, `until`) estão na hora do servidor. Use `view.now` para calcular a diferença em relação ao relógio local: `offset = view.now - Date.now()` na chegada.
@@ -148,9 +152,11 @@ Nunca contém cartas nem tokens. Em `ended` a sala funciona como lobby: o anfitr
 
 ## Timer de turno
 
-- `turnMs` (padrão 30 s, `MOISES_TURN_MS`) vale para **cada decisão** do jogador da vez: comprar (`draw`), ficar ou descartar (`decide`), usar ou pular o poder (`power`, `powerSwap`). `turnDeadline` mostra o prazo atual; durante a janela de reação ele é `null` (a janela tem prazo próprio, `reactionWindow.deadline`).
+- `turnMs` (padrão 15 s, `MOISES_TURN_MS`; o anfitrião troca por mesa com `room:setTable`) vale para **cada decisão** do jogador da vez: comprar (`draw`), ficar ou descartar (`decide`), usar ou pular o poder (`power`, `powerSwap`). `turnDeadline` mostra o prazo atual; durante a janela de reação ele é `null` (a janela tem prazo próprio, `reactionWindow.deadline`).
 - Se o prazo vencer, o servidor publica `turnTimedOut` e joga o mínimo pelo resto daquele turno: compra se ainda não comprou, descarta a carta comprada e pula o poder. Uma ação atrasada depois disso é recusada (normalmente `INVALID_PHASE`).
-- Jogadores desconectados ou que saíram continuam cobertos pelo timer.
+- Jogadores desconectados continuam cobertos pelo timer. Quem **sai** (`room:leave`) no meio da partida é substituído por um bot no mesmo lugar (`members[i].isBot` vira `true`, mesmo `id`); o bot joga a partir da visão daquele lugar.
+- Reações: `attemptsPerWindow` = 2 (erros permitidos por jogador por descarte; um acerto fecha a janela). `reactionWindow` traz `attemptsPerPlayer` e `yourAttemptsLeft`. Reação desligada na mesa responde `REACTION_DISABLED`; com as duas desligadas a janela nem abre.
+- Ficar sem cartas não encerra a partida; o jogador continua jogando e pode chamar `callEnd`. `EndReason` agora é só `'called'`.
 
 ## Bots
 
@@ -190,7 +196,7 @@ Uma mensagem acima da taxa recebe `RATE_LIMITED` e é descartada. Atrás de prox
 | `ALREADY_IN_ROOM` | a conexão já está em uma sala |
 | `ROOM_NOT_FOUND` | código de sala inexistente |
 | `ROOM_FULL` | sem lugar (ou bots demais pedidos) |
-| `ROOM_IN_GAME` | partida em andamento; só quem já está sentado volta (com token) |
+| `ROOM_IN_GAME` | não é mais devolvido por `room:join` (fila); mantido por compatibilidade |
 | `ROOM_LIMIT` | limite de salas (global ou por IP) |
 | `NOT_HOST` | só o anfitrião pode |
 | `NOT_ENOUGH_PLAYERS` | menos jogadores que o mínimo (2) |
