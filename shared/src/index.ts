@@ -5,4 +5,5 @@ export * from './events.js';
 export * from './game.js';
 export * from './limits.js';
 export * from './powers.js';
+export * from './protocol.js';
 export type * from './view.js';
