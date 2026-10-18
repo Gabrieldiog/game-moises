@@ -33,3 +33,10 @@ Configuração em `client/.env.example` (`VITE_SERVER_URL`). Modo demo: em dev, 
 `?demo=<cena>&jogadores=<2..6>` (ex.: `?demo=reacao&jogadores=4`; `&tempo=3` deixa os prazos 3× mais longos).
 Cenas: `arrumacao`, `espiada`, `minha-vez`, `comprada`, `poder-ver-minha`, `poder-ver-inimigo`, `poder-q`,
 `poder-j`, `poder-j-troca`, `poder-k`, `poder-k-troca`, `reacao`, `vez-de-outro`, `estou-foda`, `fim`.
+
+## Como jogar
+- Cada jogador recebe 4 cartas viradas (grade 2×2). No começo você vê por 5 s as 2 de baixo. Decore!
+- Na sua vez, compre do monte e troque com uma das suas ou descarte. Cartas de poder (7–K preto) só valem se forem compradas e descartadas.
+- Alguém descartou um número que você tem? Grite **"Filha da putinha!"** e descarte a sua. Sabe onde está esse número na mesa de um inimigo? **"Filho da puta!"**: pegue a dele e entregue uma sua.
+- Quando achar que tem a menor soma, fale **"Estou foda"**. Cada um joga mais uma vez e todas as cartas são reveladas. Menor soma vence (K vermelho = −1, coringa = 0).
+- Regras completas em `docs/REGRAS.md`; deploy em `docs/DEPLOY.md`.

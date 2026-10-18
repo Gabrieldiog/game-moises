@@ -5,7 +5,7 @@ services:
       context: .
       args:
         # Endereço público do jogo (https://seu-dominio). Embutido no JS do cliente; não é segredo.
-        VITE_SERVER_URL: ${VITE_SERVER_URL:?defina VITE_SERVER_URL no .env}
+        VITE_SERVER_URL: ${VITE_SERVER_URL:-}
     image: moises:latest
     restart: unless-stopped
     environment:

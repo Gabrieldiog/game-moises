@@ -11,7 +11,7 @@ Uma porta só: o servidor Node serve o cliente web (`client/dist`), o Socket.IO 
 | `PORT` | não (3000) | porta local do servidor |
 | `TRUST_PROXY_HOPS` | sim, atrás do Caddy | `1`. Com `0`, todos os jogadores aparecem com o IP do proxy e dividem os limites por IP |
 | `STATIC_DIR` | para servir o cliente | pasta do build do cliente. No Docker já vem configurada |
-| `VITE_SERVER_URL` | sim, **na hora do build** | mesma URL pública. Vai embutida no JS do cliente (não é segredo). Vazio = o cliente abre em modo demonstração, sem servidor |
+| `VITE_SERVER_URL` | não | só se o cliente for servido de outra origem. Vazio = conecta na própria origem (padrão nesta configuração) |
 
 Demais ajustes (limites, tempos, bots): `server/.env.example`.
 
@@ -20,7 +20,7 @@ Demais ajustes (limites, tempos, bots): `server/.env.example`.
 ```sh
 sudo apt update && sudo apt install -y git docker.io docker-compose-v2
 git clone <repo> moises && cd moises
-cp .env.example .env && nano .env      # VITE_SERVER_URL, CORS_ORIGIN, TRUST_PROXY_HOPS=1
+cp .env.example .env && nano .env      # CORS_ORIGIN, TRUST_PROXY_HOPS=1
 sudo docker compose up -d --build
 curl http://127.0.0.1:3000/health      # {"status":"ok"}
 sudo docker compose ps                 # STATUS "healthy"
@@ -34,7 +34,7 @@ A porta é publicada só em `127.0.0.1`; o acesso externo passa pelo Caddy.
 # Node 22 (ex.: https://github.com/nodesource/distributions ou nvm)
 git clone <repo> moises && cd moises
 npm ci
-VITE_SERVER_URL=https://moises.example.com npm run build
+npm run build
 npm ci --omit=dev                      # opcional: tira dependências de desenvolvimento
 sudo tee /etc/moises.env >/dev/null <<'ENV'
 NODE_ENV=production
@@ -104,7 +104,7 @@ cd moises && git pull
 # Docker:
 sudo docker compose up -d --build
 # Node direto:
-npm ci && VITE_SERVER_URL=https://moises.example.com npm run build && npm ci --omit=dev
+npm ci && npm run build && npm ci --omit=dev
 sudo systemctl restart moises
 ```
 
