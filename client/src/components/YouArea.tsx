@@ -19,10 +19,12 @@ export interface YouAreaProps {
   readonly look?: AvatarLook | undefined;
   /** Shown at the right of your name plaque, under the grid ("Estou foda"). */
   readonly beside?: ReactNode;
+  /** Small table tools (history, sound), in the empty column left of your grid. */
+  readonly tools?: ReactNode;
 }
 
 /** Your seat at the bottom: the big grid and the card in your hand. */
-export function YouArea({ view, me, now, drawn, isSelectable, isSelected, onSelect, beside, look }: YouAreaProps) {
+export function YouArea({ view, me, now, drawn, isSelectable, isSelected, onSelect, beside, tools, look }: YouAreaProps) {
   const isTurn = view.phase === 'playing' && view.turn?.playerId === me.id;
   const called = view.endCall?.callerId === me.id;
   const lastTurn = view.endCall?.pending.includes(me.id) === true;
@@ -30,7 +32,7 @@ export function YouArea({ view, me, now, drawn, isSelectable, isSelected, onSele
   return (
     <section className={cx('me', isTurn && 'is-turn')} aria-label="Suas cartas">
       <div className="me__table">
-        <div className="me__side" />
+        <div className="me__side">{tools}</div>
         <Grid
           player={me}
           now={now}

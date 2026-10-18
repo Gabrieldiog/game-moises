@@ -90,10 +90,11 @@ O payload é exatamente uma `Action` de `shared/src/actions.ts`. Ações levam s
 | `{ type: 'usePower', power, ... }` | jogador da vez, passo `power` (formato por poder em `actions.ts`) |
 | `{ type: 'powerSwap', ownSlot, target }` | jogador da vez, passo `powerSwap` |
 | `{ type: 'skipPower' }` | jogador da vez, passos `power` e `powerSwap` |
+| `{ type: 'claimReaction', kind: 'matchOwn' \| 'matchOpponent' }` ("gritar") | qualquer jogador (inclusive o da vez), janela de reação aberta e sem dono |
 | `{ type: 'matchOwn', slot }` ("Filha da putinha") | qualquer jogador, janela de reação aberta |
 | `{ type: 'matchOpponent', target, giveSlot }` ("Filho da puta") | qualquer jogador, janela de reação aberta |
 
-Recusas do motor voltam com o código de `shared/src/errors.ts`: `NOT_YOUR_TURN`, `INVALID_PHASE`, `INVALID_SLOT`, `EMPTY_SLOT`, `SAME_SLOT`, `INVALID_TARGET`, `POWER_MISMATCH`, `WRONG_TARGET_COUNT`, `DUPLICATE_TARGET`, `TARGET_NOT_PEEKED`, `REACTION_WINDOW_CLOSED`, `REACTION_ALREADY_ATTEMPTED`, `END_ALREADY_CALLED`, `GAME_OVER`. Uma ação recusada não muda nada.
+Recusas do motor voltam com o código de `shared/src/errors.ts`: `NOT_YOUR_TURN`, `INVALID_PHASE`, `INVALID_SLOT`, `EMPTY_SLOT`, `SAME_SLOT`, `INVALID_TARGET`, `POWER_MISMATCH`, `WRONG_TARGET_COUNT`, `DUPLICATE_TARGET`, `TARGET_NOT_PEEKED`, `REACTION_WINDOW_CLOSED`, `REACTION_ALREADY_ATTEMPTED`, `REACTION_CLAIMED`, `REACTION_DISABLED`, `END_ALREADY_CALLED`, `GAME_OVER`. Uma ação recusada não muda nada.
 
 ## Eventos servidor → cliente
 
@@ -134,7 +135,14 @@ Nunca contém cartas nem tokens. Em `ended` a sala funciona como lobby: o anfitr
 
 - Cada socket recebe **apenas** `viewFor(estado, seuJogador, agora)`. Uma carta escondida nunca aparece em mensagem nenhuma: só a carta comprada (para quem comprou), as cartas vistas por poder (para quem viu, até `until`), a espiada inicial (dono), cartas reveladas a todos após reação errada, o descarte e, no fim, todas.
 - **Poder pendente** (`view.turn`): `pendingPower` é público (a carta descartada está virada para cima). `powerTargetCount` diz quantas cartas o jogador da vez deve escolher no `usePower` desse poder, para o cliente não repetir número de regra: `targets.length` no `peekManyAndSwap` (`rules.powers.peekManyCount`, limitado às cartas de oponentes que ainda estão na mesa, o mesmo cálculo que o motor usa para recusar com `WRONG_TARGET_COUNT`) e `1` nos poderes de uma escolha só; `null` quando não há poder pendente. O valor só é definitivo com `turn.step === 'power'` (durante a janela de reação a mesa ainda pode mudar). É informação pública: deriva só de contagens de cartas, nunca de faces.
-- `events` são públicos (iguais para todos) e servem para animações e histórico. Além dos eventos do motor (`shared/src/events.ts`), existe `{ type: 'turnTimedOut', playerId, turnNumber, step }`.
+- `events` são públicos (iguais para todos) e servem para animações e histórico. Eventos de transparência (só posições, **nunca** faces escondidas; vão em `GameUpdate.events` para todos):
+  - `cardPeeked { by, target: {playerId, slot} }`: um por carta vista (7/8/9/10, J e K preto);
+  - `cardsSwapped { by, a: {playerId, slot}, b: {playerId, slot}, blind }`: troca entre posições (Q: `blind: true`; J/K depois de espiar: `blind: false`). A troca com a carta comprada continua em `drawnCardSwapped` (que mostra a carta descartada, pública);
+  - `powerUsed { by, power, ownSlot, targets }` e `powerSkipped { by, power, reason }` (antes usavam `playerId`; `powerSwapped` foi substituído por `cardsSwapped`);
+  - `reactionClaimed { by, kind }`;
+  - `reactionResolved { by, kind, ok, slots: SlotRef[] }`: resultado de cada tentativa (matchOwn: a posição do jogador; matchOpponent: o alvo e a posição entregue). Claim vencido: `ok: false, slots: []`. A face revelada num erro continua só em `reactionFailed.revealed`.
+
+  Além dos eventos do motor (`shared/src/events.ts`), existe `{ type: 'turnTimedOut', playerId, turnNumber, step }`.
 - Logo após `session:resume`, chega um `game:update` com `events: []` (retrato completo).
 - **Relógio**: todos os prazos (`turnDeadline`, `view.phaseDeadline`, `reactionWindow.deadline`, `until`) estão na hora do servidor. Use `view.now` para calcular a diferença em relação ao relógio local: `offset = view.now - Date.now()` na chegada.
 
@@ -157,6 +165,8 @@ Nunca contém cartas nem tokens. Em `ended` a sala funciona como lobby: o anfitr
 - Se o prazo vencer, o servidor publica `turnTimedOut` e joga o mínimo pelo resto daquele turno: compra se ainda não comprou, descarta a carta comprada e pula o poder. Uma ação atrasada depois disso é recusada (normalmente `INVALID_PHASE`).
 - Jogadores desconectados continuam cobertos pelo timer. Quem **sai** (`room:leave`) no meio da partida é substituído por um bot no mesmo lugar (`members[i].isBot` vira `true`, mesmo `id`); o bot joga a partir da visão daquele lugar.
 - Reações: `attemptsPerWindow` = 2 (erros permitidos por jogador por descarte; um acerto fecha a janela). `reactionWindow` traz `attemptsPerPlayer` e `yourAttemptsLeft`. Reação desligada na mesa responde `REACTION_DISABLED`; com as duas desligadas a janela nem abre.
+- **Gritar (`claimReaction`)**: o primeiro claim válido trava a janela para aquele jogador e move o prazo para `agora + reactionClaimMs` (padrão 8 s, `MOISES_REACTION_CLAIM_MS`, 250–60000 ms). Os demais recebem `REACTION_CLAIMED` (inclusive em `matchOwn`/`matchOpponent`). O dono envia `matchOwn`/`matchOpponent` com o mesmo `kind` do claim (outro `kind` volta `INVALID_ACTION`). Se o prazo do claim vencer sem ação, a tentativa conta como gasta, nada é revelado e a janela fecha (`reactionWindowClosed` com `reason: 'claimExpired'`). Reação errada do dono revela a carta dele como antes, solta a trava e reabre o prazo (no mínimo `reactionWindowMs` a partir dali). `matchOwn`/`matchOpponent` sem claim continuam aceitos. `reactionWindow` ganhou `claimedBy` e `claimKind` (`null` quando livre); `deadline` já reflete o prazo estendido.
+- O jogador da vez (inclusive com poder pendente) pode reagir na janela do próprio descarte; o poder continua disponível depois, se a janela fechar.
 - Ficar sem cartas não encerra a partida; o jogador continua jogando e pode chamar `callEnd`. `EndReason` agora é só `'called'`.
 
 ## Bots

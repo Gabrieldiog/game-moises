@@ -139,6 +139,9 @@ describe('bot turn', () => {
     bot.sync();
     expect(bot.play()).toEqual({ type: 'discardDrawn' });
     bot.sync();
+    expect(bot.decide()).toEqual({ type: 'claimReaction', kind: 'matchOwn' });
+    bot.play();
+    bot.sync();
     expect(bot.decide()).toEqual({ type: 'matchOwn', slot: 3 });
     bot.play();
     expect(game.grid('p2')[3]).toBeNull();
@@ -178,6 +181,8 @@ describe('bot turn', () => {
     // p1 discards a 7: the bot knows p1 holds the 7 of diamonds.
     human(game, seats, 'p1', { type: 'draw' });
     human(game, seats, 'p1', { type: 'discardDrawn' });
+    expect(bot.play()).toEqual({ type: 'claimReaction', kind: 'matchOpponent' });
+    bot.sync();
     const reaction = bot.decide();
     expect(reaction).toMatchObject({ type: 'matchOpponent', target: { playerId: 'p1', slot: 0 } });
     bot.play();
@@ -294,6 +299,8 @@ describe('bot end call and timing', () => {
     const bot = seat(seats, 'p2');
     human(game, seats, 'p1', { type: 'draw' });
     human(game, seats, 'p1', { type: 'discardDrawn' });
+    expect(bot.play()).toEqual({ type: 'claimReaction', kind: 'matchOwn' });
+    bot.sync();
     expect(bot.play()).toEqual({ type: 'matchOwn', slot: 3 });
     bot.sync();
     expect(bot.decide()).toBeNull();

@@ -543,7 +543,7 @@ describe('Q: blind swap — nobody sees anything, not even through events', () =
     game.act('p1', { type: 'usePower', power: 'blindSwap', ownSlot: 1, target: { playerId: 'p3', slot: 2 } });
     expect(game.grid('p1')[1]).toEqual(c('4D'));
     expect(game.grid('p3')[2]).toEqual(c('3S'));
-    expect(game.lastEvents.map((event) => event.type)).toEqual(['powerUsed', 'turnStarted']);
+    expect(game.lastEvents.map((event) => event.type)).toEqual(['powerUsed', 'cardsSwapped', 'turnStarted']);
     expect(facesIn(game.lastEvents)).toEqual([]);
     expect(game.state.reveals).toEqual([]);
     for (const viewer of ['p1', 'p2', 'p3', 'spectator']) {
@@ -700,7 +700,7 @@ describe('a player left without cards, while holding a power', () => {
     keepOnlySlot0(game, 'p1');
     game.act('p1', { type: 'draw' }).act('p1', { type: 'discardDrawn' });
     game.act('p1', { type: 'matchOwn', slot: 0 });
-    expect(game.lastEvents).toContainEqual({ type: 'powerSkipped', playerId: 'p1', power: 'peekOwn', reason: 'unusable' });
+    expect(game.lastEvents).toContainEqual({ type: 'powerSkipped', by: 'p1', power: 'peekOwn', reason: 'unusable' });
     expect(game.state.endCall).toBeNull();
     expect(game.current).toBe('p2');
   });
@@ -722,7 +722,7 @@ describe('a player left without cards, while holding a power', () => {
     keepOnlySlot0(game, 'p1');
     game.act('p1', { type: 'draw' }).act('p1', { type: 'discardDrawn' });
     game.act('p1', { type: 'matchOwn', slot: 0 });
-    expect(game.lastEvents).toContainEqual({ type: 'powerSkipped', playerId: 'p1', power: 'blindSwap', reason: 'unusable' });
+    expect(game.lastEvents).toContainEqual({ type: 'powerSkipped', by: 'p1', power: 'blindSwap', reason: 'unusable' });
     expect(game.current).toBe('p2');
   });
 });
@@ -962,7 +962,7 @@ describe('fuzz: random full games checked against independent oracles', () => {
         if (countCards(reactorAfter) === 0) stats.emptiedGrid++;
       } else {
         stats.wrong++;
-        expect(types).toEqual(['reactionFailed']); // nothing else happens
+        expect(types).toEqual(['reactionFailed', 'reactionResolved']); // nothing else happens
         expect(after.players).toEqual(before.players); // nothing moves
         expect(after.discardPile).toEqual(before.discardPile);
         expect(after.reaction).not.toBeNull(); // a wrong guess does not close the window

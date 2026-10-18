@@ -20,3 +20,14 @@ export const QUICK_PLAY_DEFAULT_BOTS = 2;
 
 /** How much one tap on the "Tempo por decisão" stepper changes (the bounds come from PROTOCOL_LIMITS). */
 export const TURN_SECONDS_STEP = 5;
+
+/** How long each table narration (balloon, eye, flying cards) stays on screen. */
+export const BEAT_MS = 1_100;
+/** Two cards flying take a little longer to read. */
+export const BEAT_MS_SWAP = 1_300;
+/** When narrations pile up, each one is shown for this long. */
+export const BEAT_MS_BUSY = 700;
+/** The cards' flight when two positions swap. */
+export const SWAP_FLIGHT_MS = 680;
+/** Lines kept in the play history. */
+export const FEED_MAX = 20;

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { parseAction, type Action, type GameView } from '@moises/shared';
 import { buildScenario, type ScenarioId } from '../demo/fixtures';
 import { NO_PICKS, type Picks, type Shout } from '../game/intent';
-import { uiContext } from '../game/selectors';
+import { reactionOffer, uiContext } from '../game/selectors';
 import { ActionBar, CallEndButton } from './ActionBar';
 
 const NOW = 1_000;
@@ -13,13 +13,22 @@ function scene(id: ScenarioId, players = 4): GameView {
   return buildScenario(id, { players, now: NOW });
 }
 
-function setup(view: GameView, picks: Picks = NO_PICKS, shout: Shout | null = null) {
+function setup(view: GameView, picks: Picks = NO_PICKS, claiming: Shout | null = null) {
   const onSend = vi.fn<(action: Action) => void>();
   const onShout = vi.fn<(shout: Shout) => void>();
   const onCancel = vi.fn();
   const ctx = uiContext(view, NOW);
   const utils = render(
-    <ActionBar ctx={ctx} picks={picks} shout={shout} onSend={onSend} onShout={onShout} onCancel={onCancel} />,
+    <ActionBar
+      view={view}
+      ctx={ctx}
+      picks={picks}
+      offer={reactionOffer(view, NOW)}
+      claiming={claiming}
+      onSend={onSend}
+      onShout={onShout}
+      onRestart={onCancel}
+    />,
   );
   /** Every action the bar sends must match the shared ActionSchema. */
   const sent = () =>
@@ -59,8 +68,9 @@ describe('ActionBar by phase', () => {
   it('J power: pick an opponent card to peek, or skip', async () => {
     const view = scene('poder-j');
     const { sent, unmount } = setup(view);
-    expect(screen.getByRole('button', { name: 'Espiar a carta' })).toBeDisabled();
-    await userEvent.click(screen.getByRole('button', { name: 'Pular' }));
+    expect(screen.getByRole('button', { name: 'Escolha a do inimigo' })).toBeDisabled();
+    expect(screen.getByRole('listitem', { current: 'step' })).toHaveTextContent('Toque numa carta de um INIMIGO');
+    await userEvent.click(screen.getByRole('button', { name: 'Não usar' }));
     expect(sent()).toEqual([{ type: 'skipPower' }]);
     unmount();
 
@@ -81,8 +91,14 @@ describe('ActionBar by phase', () => {
 
   it('Q power: needs one of yours and one of theirs', async () => {
     const view = scene('poder-q');
+    const none = setup(view);
+    expect(screen.getByRole('button', { name: 'Escolha uma sua' })).toBeDisabled();
+    expect(screen.getByRole('listitem', { current: 'step' })).toHaveTextContent('Toque numa carta SUA');
+    none.unmount();
     const { unmount } = setup(view, { own: [1], opponents: [] });
-    expect(screen.getByRole('button', { name: 'Trocar no escuro' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Escolha a do inimigo' })).toBeDisabled();
+    expect(screen.getByRole('listitem', { current: 'step' })).toHaveTextContent('Toque numa carta de um INIMIGO');
+    expect(screen.getByRole('button', { name: 'Não trocar' })).toBeEnabled();
     unmount();
     const both = setup(view, { own: [1], opponents: [{ playerId: 's1', slot: 2 }] });
     await userEvent.click(screen.getByRole('button', { name: 'Trocar no escuro' }));
@@ -104,10 +120,10 @@ describe('ActionBar by phase', () => {
 
   it('after a black K peek: the target must be chosen among the peeked cards', () => {
     setup(scene('poder-k-troca'), { own: [0], opponents: [] });
-    expect(screen.getByRole('button', { name: 'Trocar' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Escolha a que viu' })).toBeDisabled();
   });
 
-  it('reaction window: two big shouts', async () => {
+  it('reaction window: two big shouts (step 1 claims the window)', async () => {
     const { onShout } = setup(scene('reacao'));
     await userEvent.click(screen.getByRole('button', { name: /Filha da putinha!/ }));
     await userEvent.click(screen.getByRole('button', { name: /Filho da puta!/ }));
@@ -126,12 +142,13 @@ describe('ActionBar by phase', () => {
     const onSend = vi.fn();
     render(
       <ActionBar
+        view={view}
         ctx={uiContext(view, NOW)}
         picks={NO_PICKS}
-        shout={null}
+        offer={reactionOffer(view, NOW)}
         onSend={onSend}
         onShout={vi.fn()}
-        onCancel={vi.fn()}
+        onRestart={vi.fn()}
         reactions={{ matchOwn: false, matchOpponent: true }}
       />,
     );
@@ -154,18 +171,44 @@ describe('ActionBar by phase', () => {
     expect(screen.getByRole('button', { name: /Filho da puta!/ })).toBeDisabled();
   });
 
-  it('a waiting shout says which card to tap and can be cancelled', async () => {
-    const { onCancel } = setup(scene('reacao'), NO_PICKS, 'matchOpponent');
-    expect(screen.getByText('Toque na carta igual do inimigo.')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+  it('while the shout is on its way, the button says so and nothing else can be pressed', () => {
+    setup(scene('reacao'), NO_PICKS, 'matchOpponent');
+    expect(screen.getByRole('button', { name: /Gritando/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Filha da putinha!/ })).toBeDisabled();
+  });
+
+  it('claimed by you: a guide says which card to tap, step by step, and no shout buttons', () => {
+    setup(scene('reacao-gritei'));
+    expect(screen.queryByRole('button', { name: /Filho da puta!/ })).toBeNull();
+    expect(screen.getByRole('listitem', { current: 'step' })).toHaveTextContent('Toque na carta do INIMIGO igual ao 5♥');
+  });
+
+  it('claimed by you, target chosen: next step is the card you give, and you can start over', async () => {
+    const { onCancel } = setup(scene('reacao-gritei'), { own: [], opponents: [{ playerId: 's1', slot: 0 }] });
+    expect(screen.getByRole('listitem', { current: 'step' })).toHaveTextContent('Toque numa carta SUA para entregar');
+    await userEvent.click(screen.getByRole('button', { name: 'Recomeçar' }));
     expect(onCancel).toHaveBeenCalled();
+  });
+
+  it('claimed by someone else: shouts locked, with the reason', () => {
+    setup(scene('reacao-outro-gritou'));
+    expect(screen.getByText('Beto gritou primeiro e está escolhendo…')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Filho da puta!/ })).toBeDisabled();
+  });
+
+  it('shouts stay available next to a power of your own while a window is open', () => {
+    const power = scene('poder-q');
+    const window = scene('reacao').reactionWindow!;
+    setup({ ...power, reactionWindow: window });
+    expect(screen.getByRole('button', { name: /Filha da putinha!/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Escolha uma sua' })).toBeInTheDocument();
   });
 });
 
 describe('CallEndButton ("Estou foda")', () => {
   function renderEnd(view: GameView) {
     const onSend = vi.fn<(action: Action) => void>();
-    const utils = render(<CallEndButton view={view} ctx={uiContext(view, NOW)} onSend={onSend} />);
+    const utils = render(<CallEndButton view={view} onSend={onSend} />);
     return { ...utils, onSend };
   }
 
@@ -196,10 +239,7 @@ describe('CallEndButton ("Estou foda")', () => {
 describe('reaction attempts', () => {
   it('shows how many attempts are left on each reaction button', () => {
     const view = scene('reacao');
-    const ctx = uiContext(view, NOW);
-    render(
-      <ActionBar ctx={ctx} picks={NO_PICKS} shout={null} onSend={vi.fn()} onShout={vi.fn()} onCancel={vi.fn()} attempts={{ left: 1, total: 2 }} />,
-    );
+    setup({ ...view, reactionWindow: { ...view.reactionWindow!, yourAttemptsLeft: 1 } });
     expect(screen.getAllByText('Você tem mais 1 tentativa.')).toHaveLength(2);
   });
 });

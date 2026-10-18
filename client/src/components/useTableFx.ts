@@ -1,17 +1,8 @@
-import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useLayoutEffect, useRef, type RefObject } from 'react';
 import type { PlayerId, ServerGameEvent } from '@moises/shared';
 import backUrl from '../assets/card-back.svg';
 import { planFx, type FxStep } from '../game/fxPlan';
 import { ghostCard, moveFrom } from './fx';
-
-export interface Stamp {
-  readonly id: number;
-  readonly ok: boolean;
-  readonly reaction: 'matchOwn' | 'matchOpponent';
-  readonly playerId: PlayerId;
-}
-
-const STAMP_MS = 1400;
 
 function anchors(root: ParentNode): Map<string, HTMLElement> {
   const map = new Map<string, HTMLElement>();
@@ -29,19 +20,15 @@ const fallback = (key: string): string | null => (key.startsWith('hand:') ? `sea
  * Plays the animations for the public events of each new GameUpdate.
  * Before the screen changes it remembers where every anchored element was
  * (FLIP), so a card can be shown traveling from its old place to its new one.
- * Returns the reaction stamp to show, if any.
  */
 export function useTableFx(
   rootRef: RefObject<HTMLElement | null>,
   events: readonly ServerGameEvent[],
   seq: number,
   me: PlayerId | null,
-): Stamp | null {
+): void {
   const rects = useRef(new Map<string, DOMRect>());
   const lastSeq = useRef<number | null>(null);
-  const stampId = useRef(0);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [stamp, setStamp] = useState<Stamp | null>(null);
 
   // No dependency list on purpose: positions are refreshed after every render.
   useLayoutEffect(() => {
@@ -54,13 +41,6 @@ export function useTableFx(
     lastSeq.current = seq;
     rects.current = new Map([...now].map(([key, el]) => [key, el.getBoundingClientRect()]));
   });
-
-  useLayoutEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
 
   function before(key: string): DOMRect | undefined {
     const fb = fallback(key);
@@ -82,14 +62,8 @@ export function useTableFx(
         const from = before(step.from);
         const to = now.get(step.to)?.getBoundingClientRect();
         if (from && to) ghostCard(backUrl, from, to);
-      } else if (step.kind === 'stamp') {
-        stampId.current += 1;
-        setStamp({ id: stampId.current, ok: step.ok, reaction: step.reaction, playerId: step.playerId });
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(() => setStamp(null), STAMP_MS);
       }
     }
   }
 
-  return stamp;
 }

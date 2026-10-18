@@ -40,8 +40,9 @@ describe('Table', () => {
     expect(document.querySelectorAll('.seat')).toHaveLength(players - 1);
   });
 
-  it('never renders a face that the view did not send', () => {
-    for (const { id } of SCENARIOS) {
+  // One case per scene (same assertions as before): a single loop over every scene and size outgrew the 5 s test budget under the full suite.
+  it.each(SCENARIOS.map((s) => s.id))('never renders a face that the view did not send (%s)', (id) => {
+    {
       for (const players of DEMO_PLAYER_COUNTS) {
         const { view, unmount, container } = renderTable(id, players);
         // The final screen repeats every grid on the score tab.
@@ -113,22 +114,61 @@ describe('Table', () => {
     expect(onSend).toHaveBeenCalledWith({ type: 'usePower', power: 'peekAndSwap', target: { playerId: 's2', slot: 2 } });
   });
 
-  it('"Filho da puta": shout first, then the target and the card you give', async () => {
+  it('a shout claims the window first (step 1); nothing else is sent', async () => {
     const { onSend } = renderTable('reacao');
     await user().click(screen.getByRole('button', { name: /Filho da puta!/ }));
-    expect(screen.getByText('Toque na carta igual do inimigo.')).toBeInTheDocument();
+    expect(onSend.mock.calls).toEqual([[{ type: 'claimReaction', kind: 'matchOpponent' }]]);
+    expect(parseAction(onSend.mock.calls[0]![0]).ok).toBe(true);
+    expect(screen.getByRole('button', { name: /Gritando/ })).toBeDisabled();
+  });
+
+  it('"Filho da puta" claimed by you: the enemy card, then the card you give', async () => {
+    const { onSend } = renderTable('reacao-gritei');
+    // Step 1 lights only enemy cards.
+    expect(screen.queryByRole('button', { name: /Sua posição/ })).toBeNull();
     await user().click(screen.getByRole('button', { name: /Cida, posição 2/ }));
-    expect(screen.getByText('Agora toque na carta sua que vai entregar.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Cida, posição 1/ })).toBeNull();
     await user().click(screen.getByRole('button', { name: /Sua posição 4/ }));
     expect(onSend).toHaveBeenCalledWith({ type: 'matchOpponent', target: { playerId: 's3', slot: 1 }, giveSlot: 3 });
     expect(parseAction(onSend.mock.calls[0]![0]).ok).toBe(true);
   });
 
-  it('"Filha da putinha": with your card already chosen it goes at once', async () => {
-    const { onSend } = renderTable('reacao');
+  it('"Filha da putinha" claimed by you: one tap on your card sends it', async () => {
+    const { onSend } = renderTable('reacao-gritei-igual');
     await user().click(screen.getByRole('button', { name: /Sua posição 1/ }));
-    await user().click(screen.getByRole('button', { name: /Filha da putinha!/ }));
     expect(onSend).toHaveBeenCalledWith({ type: 'matchOwn', slot: 0 });
+  });
+
+  it('Q power: yours first, then an enemy card, then the choice', async () => {
+    const { onSend } = renderTable('poder-q');
+    expect(screen.queryByRole('button', { name: /Ana, posição/ })).toBeNull();
+    await user().click(screen.getByRole('button', { name: /Sua posição 2/ }));
+    await user().click(screen.getByRole('button', { name: /Ana, posição 3/ }));
+    await user().click(screen.getByRole('button', { name: 'Trocar no escuro' }));
+    expect(onSend).toHaveBeenCalledWith({ type: 'usePower', power: 'blindSwap', ownSlot: 1, target: { playerId: 's1', slot: 2 } });
+  });
+
+  it('tells other players\' moves: a balloon and a line in the history', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(LOCAL_NOW);
+    const view = buildScenario('vez-de-outro', { players: 3, now: SERVER_NOW });
+    const props = { clockOffset: SERVER_NOW - LOCAL_NOW, onSend: () => {}, onLeave: () => {} };
+    const { rerender } = render(<Table view={view} events={[]} eventsSeq={1} {...props} />);
+    rerender(
+      <Table
+        view={view}
+        events={[{ type: 'cardsSwapped', by: 's1', a: { playerId: 's1', slot: 0 }, b: { playerId: 's0', slot: 2 }, blind: true }]}
+        eventsSeq={2}
+        {...props}
+      />,
+    );
+    expect(screen.getAllByText('Ana trocou no escuro a própria carta 1 com a sua carta 3').length).toBeGreaterThan(0);
+    act(() => {
+      screen.getByRole('button', { name: /Abrir histórico/ }).click();
+    });
+    expect(within(screen.getByRole('log')).getByText('Ana trocou no escuro a própria carta 1 com a sua carta 3')).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(5_000));
+    vi.useRealTimers();
   });
 
   it('shows the "Estou foda" banner with who still plays', () => {

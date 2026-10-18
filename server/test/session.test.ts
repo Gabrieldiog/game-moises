@@ -95,7 +95,7 @@ describe('turn timer', () => {
     s.advance(PLAY + TURN + WINDOW);
     const events = s.drainEvents();
     expect(types(events)).toEqual(['reactionWindowClosed', 'powerAvailable', 'powerSkipped', 'turnStarted']);
-    expect(events).toContainEqual({ type: 'powerSkipped', playerId: 'p1', power: 'peekOwn', reason: 'player' });
+    expect(events).toContainEqual({ type: 'powerSkipped', by: 'p1', power: 'peekOwn', reason: 'player' });
     expect(s.stats.timeouts).toBe(1); // one timeout for the whole turn
   });
 
@@ -112,7 +112,7 @@ describe('turn timer', () => {
     expect(s.drainEvents()).toEqual(
       expect.arrayContaining([
         { type: 'turnTimedOut', playerId: 'p1', turnNumber: 1, step: 'power' },
-        { type: 'powerSkipped', playerId: 'p1', power: 'peekOwn', reason: 'player' },
+        { type: 'powerSkipped', by: 'p1', power: 'peekOwn', reason: 'player' },
       ]),
     );
     expect(s.internalState.turn?.playerId).toBe('p2');
@@ -165,6 +165,9 @@ describe('bots in a session', () => {
     expect(s.nextWakeAt()).toBe(PLAY + WINDOW - 50);
     s.drainEvents();
     s.advance(PLAY + WINDOW - 50);
+    // The bot shouts first (claimReaction), which extends the deadline; then it picks the card.
+    expect(s.drainEvents()).toContainEqual({ type: 'reactionClaimed', by: 'p2', kind: 'matchOwn' });
+    s.advance(PLAY + WINDOW - 50 + 5000);
     expect(s.drainEvents()).toContainEqual(expect.objectContaining({ type: 'reactionSucceeded', playerId: 'p2', slot: 3 }));
   });
 

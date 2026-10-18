@@ -33,6 +33,8 @@ export const ERROR_CODES = [
   'REACTION_WINDOW_CLOSED',
   /** The player already used their reaction attempts in this window. */
   'REACTION_ALREADY_ATTEMPTED',
+  /** Another player already claimed this reaction window (or you tried to claim again). */
+  'REACTION_CLAIMED',
   /** This reaction kind (matchOwn / matchOpponent) is switched off in this table's settings. */
   'REACTION_DISABLED',
   /** Someone already said "Estou foda" (or the end was triggered). */

@@ -1,6 +1,6 @@
 import type { SlotRef } from './actions.js';
 import type { Card } from './cards.js';
-import type { EndReason, GamePhase, GameResult, PlayerId, TurnStep } from './game.js';
+import type { EndReason, GamePhase, GameResult, PlayerId, ReactionKind, TurnStep } from './game.js';
 import type { PowerKind } from './powers.js';
 
 // What ONE player is allowed to see. Built by the server for each viewer; a
@@ -53,7 +53,11 @@ export interface ReactionWindowView {
   /** The face-up card that opened the window. */
   readonly card: Card;
   readonly openedBy: PlayerId;
+  /** Closing time; moves later when someone claims the window (claimReaction). */
   readonly deadline: number;
+  /** Player who claimed the window (only they can react now); null when unclaimed. */
+  readonly claimedBy: PlayerId | null;
+  readonly claimKind: ReactionKind | null;
   /** Players who tried at least once in this window. */
   readonly attemptedBy: readonly PlayerId[];
   /** Attempts each player gets per window (rule, default 2); a right one closes the window. */

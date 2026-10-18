@@ -1,4 +1,4 @@
-import { PROTOCOL_LIMITS, type Action, type PlayerView, type PowerKind, type SlotRef } from '@moises/shared';
+import { PROTOCOL_LIMITS, type Action, type PlayerView, type PowerKind, type ReactionKind, type SlotRef } from '@moises/shared';
 import { sameRef, type UiContext } from './selectors';
 
 // Card selection ("tap a card to choose a position / a target") and the typed
@@ -14,7 +14,7 @@ export interface Picks {
 
 export const NO_PICKS: Picks = { own: [], opponents: [] };
 
-export type Shout = 'matchOwn' | 'matchOpponent';
+export type Shout = ReactionKind;
 
 export interface PickPolicy {
   /** How many of your own cards can be selected (0 = none). */
@@ -27,38 +27,49 @@ export interface PickPolicy {
 
 const NONE: PickPolicy = { own: 0, opponents: 0, onlyRefs: null };
 
-const POWER_POLICY: Record<PowerKind, PickPolicy> = {
-  peekOwn: { own: 1, opponents: 0, onlyRefs: null },
-  peekOpponent: { own: 0, opponents: 1, onlyRefs: null },
-  blindSwap: { own: 1, opponents: 1, onlyRefs: null },
-  peekAndSwap: { own: 0, opponents: 1, onlyRefs: null },
-  // How many cards the black K shows is a server rule: it comes in
-  // TurnView.powerTargetCount (see pickPolicy). Without it, the client only
-  // caps at the protocol limit and the server answers WRONG_TARGET_COUNT.
-  peekManyAndSwap: { own: 0, opponents: PROTOCOL_LIMITS.maxPowerTargets, onlyRefs: null },
-};
-
 /** Opponent cards the black K must name: the server's number when the view has it. */
 export function peekManyTargets(targetCount: number | null): number {
   return targetCount !== null && targetCount > 0 ? targetCount : PROTOCOL_LIMITS.maxPowerTargets;
 }
 
-export function pickPolicy(ctx: UiContext, shout: Shout | null): PickPolicy {
+const own1: PickPolicy = { own: 1, opponents: 0, onlyRefs: null };
+const opp1: PickPolicy = { own: 0, opponents: 1, onlyRefs: null };
+
+/**
+ * Which cards can be tapped now. Two-card choices go in a fixed order (first
+ * one side, then the other), so only the cards of the current step light up;
+ * "Recomeçar" clears the choice.
+ */
+export function pickPolicy(ctx: UiContext, picks: Picks = NO_PICKS): PickPolicy {
   switch (ctx.kind) {
     case 'arrange':
       return { own: 2, opponents: 0, onlyRefs: null };
     case 'myDecide':
-      return { own: 1, opponents: 0, onlyRefs: null };
+      return own1;
     case 'myPower':
-      return ctx.power === 'peekManyAndSwap'
-        ? { ...POWER_POLICY.peekManyAndSwap, opponents: peekManyTargets(ctx.targetCount) }
-        : POWER_POLICY[ctx.power];
+      switch (ctx.power) {
+        case 'peekOwn':
+          return own1;
+        case 'peekOpponent':
+        case 'peekAndSwap':
+          return opp1;
+        case 'blindSwap':
+          // Q: yours first, then the opponent's.
+          return picks.own.length === 0 ? own1 : picks.opponents.length === 0 ? opp1 : NONE;
+        case 'peekManyAndSwap':
+          // How many cards the black K shows is a server rule (TurnView.powerTargetCount);
+          // without it, the client only caps at the protocol limit and the server answers WRONG_TARGET_COUNT.
+          return { own: 0, opponents: peekManyTargets(ctx.targetCount), onlyRefs: null };
+      }
+      return NONE;
     case 'myPowerSwap':
-      return { own: 1, opponents: 1, onlyRefs: ctx.peeked };
-    case 'reaction':
-      if (!ctx.canReact) return NONE;
-      if (shout === 'matchOwn') return { own: 1, opponents: 0, onlyRefs: null };
-      return { own: 1, opponents: 1, onlyRefs: null };
+      // Several peeked cards: first which of them, then yours. One peeked card: only yours.
+      if (ctx.peeked.length > 1 && picks.opponents.length === 0) return { own: 0, opponents: 1, onlyRefs: ctx.peeked };
+      return picks.own.length === 0 ? own1 : NONE;
+    case 'claim':
+      if (ctx.reaction === 'matchOwn') return own1;
+      // "Filho da puta": the opponent's card first, then the one you give.
+      return picks.opponents.length === 0 ? opp1 : own1;
     default:
       return NONE;
   }

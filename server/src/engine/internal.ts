@@ -132,13 +132,23 @@ export function openReactionWindow(d: Draft, card: Card, openedBy: PlayerId): vo
     return;
   }
   const deadline = d.now + s.rules.timings.reactionWindowMs;
-  s.reaction = { card: publicCard(card), openedBy, deadline, attempts: [] };
+  s.reaction = { card: publicCard(card), openedBy, deadline, baseDeadline: deadline, claim: null, attempts: [] };
   if (s.turn) s.turn.step = 'reaction';
   d.events.push({ type: 'reactionWindowOpened', card: publicCard(card), openedBy, deadline });
 }
 
 /** Closes the window and continues the turn: power step if there is a usable power, otherwise next turn. */
-export function closeReactionWindow(d: Draft, reason: 'timeout' | 'matched'): void {
+/** A claim whose time ran out: the attempt is spent, nothing is revealed, the window closes. */
+export function expireClaim(d: Draft): void {
+  const reaction = d.s.reaction;
+  if (!reaction?.claim) return;
+  const { by, kind } = reaction.claim;
+  reaction.attempts.push(by);
+  d.events.push({ type: 'reactionResolved', by, kind, ok: false, slots: [] });
+  closeReactionWindow(d, 'claimExpired');
+}
+
+export function closeReactionWindow(d: Draft, reason: 'timeout' | 'matched' | 'claimExpired'): void {
   const s = d.s;
   s.reaction = null;
   d.events.push({ type: 'reactionWindowClosed', reason });
@@ -157,7 +167,7 @@ function continueAfterReaction(d: Draft): void {
       return;
     }
     turn.pendingPower = null;
-    d.events.push({ type: 'powerSkipped', playerId: turn.playerId, power, reason: 'unusable' });
+    d.events.push({ type: 'powerSkipped', by: turn.playerId, power, reason: 'unusable' });
   }
   endTurn(d);
 }
@@ -232,7 +242,8 @@ export function tickDraft(d: Draft): void {
       continue;
     }
     if (s.phase === 'playing' && s.reaction && d.now >= s.reaction.deadline) {
-      closeReactionWindow(d, 'timeout');
+      if (s.reaction.claim) expireClaim(d);
+      else closeReactionWindow(d, 'timeout');
       continue;
     }
     break;

@@ -69,6 +69,10 @@ describe('what the screen offers', () => {
     expect(uiContext(scene('poder-j'), NOW)).toEqual({ kind: 'myPower', power: 'peekAndSwap', targetCount: 1 });
     expect(uiContext(scene('poder-k-troca'), NOW).kind).toBe('myPowerSwap');
     expect(uiContext(scene('reacao'), NOW)).toEqual({ kind: 'reaction', canReact: true });
+    expect(uiContext(scene('reacao-gritei'), NOW)).toEqual({ kind: 'claim', reaction: 'matchOpponent' });
+    expect(uiContext(scene('reacao-outro-gritou'), NOW)).toEqual({ kind: 'reaction', canReact: false });
+    // A window open during your power keeps the power on screen (the shouts come next to it).
+    expect(uiContext({ ...scene('poder-q'), reactionWindow: scene('reacao').reactionWindow }, NOW).kind).toBe('myPower');
     expect(uiContext(scene('vez-de-outro'), NOW)).toEqual({ kind: 'waiting', playerId: 's1' });
     expect(uiContext(scene('fim'), NOW).kind).toBe('ended');
     expect(uiContext({ ...scene('minha-vez'), you: null }, NOW).kind).toBe('spectator');
@@ -80,6 +84,9 @@ describe('what the screen offers', () => {
     const reaction = scene('reacao');
     expect(activeCountdown(reaction)).toEqual({ kind: 'reaction', deadline: reaction.reactionWindow!.deadline });
     expect(activeCountdown(scene('minha-vez'))).toBeNull();
+    const mine = scene('reacao-gritei');
+    expect(activeCountdown(mine)).toEqual({ kind: 'claim', deadline: mine.reactionWindow!.deadline });
+    expect(activeCountdown(scene('reacao-outro-gritou'))?.kind).toBe('claimOther');
   });
 
   it('only offers "Estou foda" on your own turn while nobody called it', () => {
@@ -97,7 +104,7 @@ describe('what the screen offers', () => {
 
   it('writes the status lines and the end-call banner', () => {
     expect(statusLines(scene('minha-vez'), uiContext(scene('minha-vez'), NOW), NO_PICKS).title).toBe('Sua vez');
-    expect(statusLines(scene('reacao'), uiContext(scene('reacao'), NOW), NO_PICKS).hint).toBe('Ana descartou 5♥.');
+    expect(statusLines(scene('reacao'), uiContext(scene('reacao'), NOW), NO_PICKS).hint).toBe('Ana descartou 5♥. Grite, depois escolha.');
     expect(endCallLines(scene('estou-foda', 4))).toEqual({
       title: 'Ana falou “Estou foda”!',
       hint: 'Última vez de: Beto, Cida, Você.',
@@ -108,7 +115,7 @@ describe('what the screen offers', () => {
 
 describe('card selection', () => {
   it('arrange: two of your cards become an arrange action', () => {
-    const policy = pickPolicy({ kind: 'arrange' }, null);
+    const policy = pickPolicy({ kind: 'arrange' });
     let picks = toggleOwn(NO_PICKS, 3, policy);
     expect(arrangeAction(picks)).toBeNull();
     picks = toggleOwn(picks, 0, policy);
@@ -116,7 +123,7 @@ describe('card selection', () => {
   });
 
   it('tapping a chosen card again un-chooses it; single picks replace each other', () => {
-    const policy = pickPolicy({ kind: 'myDecide' }, null);
+    const policy = pickPolicy({ kind: 'myDecide' });
     const a = toggleOwn(NO_PICKS, 1, policy);
     expect(toggleOwn(a, 2, policy).own).toEqual([2]);
     expect(toggleOwn(a, 1, policy).own).toEqual([]);
@@ -124,7 +131,7 @@ describe('card selection', () => {
 
   it('empty positions and your own seat are never opponent targets', () => {
     const view = scene('estou-foda', 4);
-    const policy = pickPolicy({ kind: 'myPower', power: 'peekOpponent', targetCount: 1 }, null);
+    const policy = pickPolicy({ kind: 'myPower', power: 'peekOpponent', targetCount: 1 });
     const ana = view.players[1]!;
     expect(canPickOpponent(policy, ana, 0)).toBe(true);
     expect(canPickOpponent(policy, ana, 3)).toBe(false); // empty
@@ -136,11 +143,17 @@ describe('card selection', () => {
     const view = scene('poder-k-troca', 4);
     const ctx = uiContext(view, NOW);
     if (ctx.kind !== 'myPowerSwap') throw new Error('unexpected context');
-    const policy = pickPolicy(ctx, null);
+    // First which of the peeked cards, then yours.
+    const policy = pickPolicy(ctx);
     const ana = view.players[1]!;
     expect(canPickOpponent(policy, ana, 0)).toBe(true);
     expect(canPickOpponent(policy, ana, 1)).toBe(false);
-    const picks = toggleOpponent(toggleOwn(NO_PICKS, 2, policy), { playerId: 's1', slot: 0 }, policy);
+    expect(canPickOwn(policy, view.players[0]!, 2)).toBe(false);
+    const target = toggleOpponent(NO_PICKS, { playerId: 's1', slot: 0 }, policy);
+    const next = pickPolicy(ctx, target);
+    expect(canPickOwn(next, view.players[0]!, 2)).toBe(true);
+    expect(canPickOpponent(next, ana, 0)).toBe(false);
+    const picks = toggleOwn(target, 2, next);
     expect(powerSwapAction(picks, ctx.peeked)).toEqual({
       type: 'powerSwap',
       ownSlot: 2,

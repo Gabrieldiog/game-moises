@@ -1,6 +1,6 @@
 import type { SlotRef } from './actions.js';
 import type { Card } from './cards.js';
-import type { EndReason, GamePhase, GameResult, PlayerId } from './game.js';
+import type { EndReason, GamePhase, GameResult, PlayerId, ReactionKind } from './game.js';
 import type { PowerKind } from './powers.js';
 
 // Public events: safe to broadcast to every player. They never contain a
@@ -24,7 +24,7 @@ export type GameEvent =
     }
   | { readonly type: 'drawnCardDiscarded'; readonly playerId: PlayerId; readonly card: Card }
   | { readonly type: 'reactionWindowOpened'; readonly card: Card; readonly openedBy: PlayerId; readonly deadline: number }
-  | { readonly type: 'reactionWindowClosed'; readonly reason: 'timeout' | 'matched' }
+  | { readonly type: 'reactionWindowClosed'; readonly reason: 'timeout' | 'matched' | 'claimExpired' }
   | {
       readonly type: 'reactionSucceeded';
       readonly reaction: 'matchOwn';
@@ -60,15 +60,27 @@ export type GameEvent =
   | { readonly type: 'powerAvailable'; readonly playerId: PlayerId; readonly power: PowerKind }
   | {
       readonly type: 'powerUsed';
-      readonly playerId: PlayerId;
+      readonly by: PlayerId;
       readonly power: PowerKind;
       readonly ownSlot: number | null;
       readonly targets: readonly SlotRef[];
     }
-  | { readonly type: 'powerSwapped'; readonly playerId: PlayerId; readonly ownSlot: number; readonly target: SlotRef }
+  /** A position was looked at by `by` (never carries the face). One event per card seen. */
+  | { readonly type: 'cardPeeked'; readonly by: PlayerId; readonly target: SlotRef }
+  /** Two positions exchanged cards (Q blind, J/K after peeking). Never carries faces. */
+  | { readonly type: 'cardsSwapped'; readonly by: PlayerId; readonly a: SlotRef; readonly b: SlotRef; readonly blind: boolean }
+  | { readonly type: 'reactionClaimed'; readonly by: PlayerId; readonly kind: ReactionKind }
+  /** Outcome of a reaction attempt (or of an expired claim: ok false, no slots). Positions only, no faces. */
+  | {
+      readonly type: 'reactionResolved';
+      readonly by: PlayerId;
+      readonly kind: ReactionKind;
+      readonly ok: boolean;
+      readonly slots: readonly SlotRef[];
+    }
   | {
       readonly type: 'powerSkipped';
-      readonly playerId: PlayerId;
+      readonly by: PlayerId;
       readonly power: PowerKind;
       /** player: declined by the player; unusable: no valid target existed. */
       readonly reason: 'player' | 'unusable';

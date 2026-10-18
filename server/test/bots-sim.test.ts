@@ -28,7 +28,7 @@ function count(t: Tally, events: readonly ServerGameEvent[]): void {
     if (e.type === 'reactionFailed') t.wrongReactions += 1;
     if (e.type === 'reactionSucceeded') t.rightReactions += 1;
     if (e.type === 'powerUsed') t.powersUsed += 1;
-    if (e.type === 'drawnCardSwapped' || e.type === 'powerSwapped') t.swaps += 1;
+    if (e.type === 'drawnCardSwapped' || e.type === 'cardsSwapped') t.swaps += 1;
     if (e.type === 'endCalled') t.ends.set(e.reason, (t.ends.get(e.reason) ?? 0) + 1);
   }
 }

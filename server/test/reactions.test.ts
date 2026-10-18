@@ -23,6 +23,7 @@ describe('matchOwn ("filha da putinha")', () => {
     expect(game.state.discardPile.slice(-2)).toEqual([c('6C'), c('6H')]);
     expect(game.lastEvents).toEqual([
       { type: 'reactionSucceeded', reaction: 'matchOwn', playerId: 'p2', slot: 0, card: c('6H') },
+      { type: 'reactionResolved', by: 'p2', kind: 'matchOwn', ok: true, slots: [{ playerId: 'p2', slot: 0 }] },
       { type: 'reactionWindowClosed', reason: 'matched' },
       { type: 'turnStarted', playerId: 'p2', turnNumber: 2 },
     ]);
@@ -55,6 +56,7 @@ describe('matchOwn ("filha da putinha")', () => {
     expect(game.state.discardPile.at(-1)).toEqual(c('6C'));
     expect(game.lastEvents).toEqual([
       { type: 'reactionFailed', reaction: 'matchOwn', playerId: 'p2', slot: 1, revealed: c('7H') },
+      { type: 'reactionResolved', by: 'p2', kind: 'matchOwn', ok: false, slots: [{ playerId: 'p2', slot: 1 }] },
     ]);
     for (const viewer of ['p1', 'p2', 'p3', 'spectator']) {
       expect(visibleSlots(game.view(viewer))).toEqual({ p1: {}, p2: { 1: '7:hearts' }, p3: {} });
@@ -115,6 +117,16 @@ describe('matchOpponent ("filho da puta")', () => {
         target: { playerId: 'p2', slot: 1 },
         giveSlot: 2,
         revealed: c('KH'),
+      },
+      {
+        type: 'reactionResolved',
+        by: 'p3',
+        kind: 'matchOpponent',
+        ok: false,
+        slots: [
+          { playerId: 'p2', slot: 1 },
+          { playerId: 'p3', slot: 2 },
+        ],
       },
     ]);
     for (const viewer of ['p1', 'p2', 'p3', 'spectator']) {

@@ -7,6 +7,7 @@ import type {
   GameResult,
   PlayerId,
   PowerKind,
+  ReactionKind,
   SlotRef,
   TurnStep,
 } from '@moises/shared';
@@ -43,7 +44,11 @@ export interface ReactionWindowState {
   /** The card that opened the window (what reactions must match). */
   readonly card: Card;
   readonly openedBy: PlayerId;
-  readonly deadline: number;
+  /** Moves later when the window is claimed; goes back to `baseDeadline` (at least) when the claim is released. */
+  deadline: number;
+  readonly baseDeadline: number;
+  /** The player who locked the window with claimReaction; only they may react until it resolves or expires. */
+  claim: { readonly by: PlayerId; readonly kind: ReactionKind } | null;
   /** One entry per accepted attempt (right or wrong), in arrival order. */
   attempts: PlayerId[];
 }
