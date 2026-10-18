@@ -13,7 +13,7 @@ export interface DemoRequest {
 }
 
 export interface ClientConfig {
-  /** VITE_SERVER_URL, or null when unset (local demo). */
+  /** Resolved server address, or null for the local demo (mock). */
   readonly serverUrl: string | null;
   /** Set when the URL asks for a demo (?demo=...). */
   readonly demo: DemoRequest | null;
@@ -32,8 +32,25 @@ function positiveNumber(raw: string | null): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-export function readConfig(env: EnvLike, search: string): ClientConfig {
-  const url = env.VITE_SERVER_URL?.trim() ?? '';
+/** VITE_SERVER_URL value meaning "the server that delivered this page". */
+export const SAME_ORIGIN = 'same-origin';
+
+/**
+ * Server address resolution:
+ * - VITE_SERVER_URL set to a URL: that URL;
+ * - "same-origin": the page's own origin (any build);
+ * - empty: production build -> the page's own origin (the server serves the
+ *   client); dev build -> null (local demo, no server).
+ */
+export function resolveServerUrl(env: EnvLike, origin: string | null): string | null {
+  const raw = env.VITE_SERVER_URL?.trim() ?? '';
+  if (raw === SAME_ORIGIN || (raw === '' && !env.DEV)) {
+    return origin !== null && origin !== '' && origin !== 'null' ? origin : null;
+  }
+  return raw === '' ? null : raw;
+}
+
+export function readConfig(env: EnvLike, search: string, origin: string | null = null): ClientConfig {
   const params = new URLSearchParams(search);
   const demoParam = params.get('demo');
   const demo: DemoRequest | null =
@@ -44,5 +61,5 @@ export function readConfig(env: EnvLike, search: string): ClientConfig {
           players: positiveNumber(params.get('jogadores')),
           timeScale: positiveNumber(params.get('tempo')),
         };
-  return { serverUrl: url === '' ? null : url, demo, demoTools: env.DEV || demo !== null };
+  return { serverUrl: resolveServerUrl(env, origin), demo, demoTools: env.DEV || demo !== null };
 }

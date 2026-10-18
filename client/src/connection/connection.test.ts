@@ -141,9 +141,34 @@ describe('ConnectionStore', () => {
 });
 
 describe('readConfig', () => {
-  it('reads the server URL from the environment, empty meaning none', () => {
-    expect(readConfig({ DEV: false, VITE_SERVER_URL: '  ' }, '').serverUrl).toBeNull();
-    expect(readConfig({ DEV: false, VITE_SERVER_URL: 'https://x.example' }, '').serverUrl).toBe('https://x.example');
+  const origin = 'https://moises.example';
+
+  it('uses VITE_SERVER_URL when it is a URL', () => {
+    expect(readConfig({ DEV: false, VITE_SERVER_URL: ' https://x.example ' }, '', origin).serverUrl).toBe('https://x.example');
+    expect(readConfig({ DEV: true, VITE_SERVER_URL: 'http://localhost:3000' }, '', origin).serverUrl).toBe('http://localhost:3000');
+  });
+
+  it('empty or same-origin in production connects to the page origin', () => {
+    expect(readConfig({ DEV: false }, '', origin).serverUrl).toBe(origin);
+    expect(readConfig({ DEV: false, VITE_SERVER_URL: '  ' }, '', origin).serverUrl).toBe(origin);
+    expect(readConfig({ DEV: false, VITE_SERVER_URL: 'same-origin' }, '', origin).serverUrl).toBe(origin);
+  });
+
+  it('same-origin also works in dev; empty in dev means demo', () => {
+    expect(readConfig({ DEV: true, VITE_SERVER_URL: 'same-origin' }, '', origin).serverUrl).toBe(origin);
+    expect(readConfig({ DEV: true }, '', origin).serverUrl).toBeNull();
+    expect(readConfig({ DEV: true, VITE_SERVER_URL: '' }, '', origin).serverUrl).toBeNull();
+  });
+
+  it('falls back to no server when the origin is unusable', () => {
+    expect(readConfig({ DEV: false }, '').serverUrl).toBeNull();
+    expect(readConfig({ DEV: false }, '', 'null').serverUrl).toBeNull();
+  });
+
+  it('?demo= keeps the server URL resolved but createConnection opens the demo', () => {
+    const config = readConfig({ DEV: false }, '?demo=reacao', origin);
+    expect(config.serverUrl).toBe(origin);
+    expect(config.demo).not.toBeNull();
   });
 
   it('turns demo tools on in dev or with ?demo=', () => {

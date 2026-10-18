@@ -25,6 +25,7 @@ describe('loadServerConfig', () => {
       CORS_ORIGIN: 'https://moises.example, https://www.moises.example',
       TRUST_PROXY_HOPS: '1',
       LOG_LEVEL: 'warn',
+      STATIC_DIR: ' ../client/dist ',
       MAX_MESSAGE_BYTES: '4096',
       MAX_CONNECTIONS: '100',
       MAX_CONNECTIONS_PER_IP: '3',
@@ -50,6 +51,7 @@ describe('loadServerConfig', () => {
       corsOrigins: ['https://moises.example', 'https://www.moises.example'],
       trustProxyHops: 1,
       logLevel: 'warn',
+      staticDir: '../client/dist',
       limits: {
         maxMessageBytes: 4096,
         maxConnections: 100,
@@ -119,6 +121,14 @@ describe('loadConfig', () => {
     const config = loadConfig({ MOISES_TURN_MS: '15000' });
     expect(config.rules.timings.turnMs).toBe(15000);
     expect(config.rules.cards).toEqual(DEFAULT_RULES.cards);
+  });
+
+  it('rejects a MOISES_TURN_MS the table settings could not echo back (room:setTable would fail)', () => {
+    for (const bad of ['4999', '3000', '250', '15500', '61000']) {
+      expect(() => loadConfig({ MOISES_TURN_MS: bad }), bad).toThrow(/MOISES_TURN_MS/);
+    }
+    expect(loadConfig({ MOISES_TURN_MS: '5000' }).rules.timings.turnMs).toBe(5000);
+    expect(loadConfig({ MOISES_TURN_MS: '60000' }).rules.timings.turnMs).toBe(60000);
   });
 
   it('reports server and rule problems together', () => {

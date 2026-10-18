@@ -22,9 +22,10 @@ import { isOriginAllowed, type ServerConfig } from '../config/env.js';
 import type { RulesConfig } from '../config/rules.js';
 import { RoomManager, type Outcome, type RoomManagerDeps } from '../rooms/manager.js';
 import { silentLogger, type Logger } from '../util/log.js';
+import { createStaticHandler, type StaticHandler } from './static.js';
 import { FailureLimiter, TokenBucket } from './rate-limit.js';
 
-// HTTP (GET /health) and Socket.IO on the same port. This layer only does
+// HTTP (GET /health, plus the built client when STATIC_DIR is set) and Socket.IO on the same port. This layer only does
 // transport concerns: origin check, connection limits, message size, rate
 // limit, schema validation of every payload, and generic error replies. Game
 // and room rules are in RoomManager / GameSession / the engine.
@@ -112,7 +113,7 @@ function sendJson(req: IncomingMessage, res: ServerResponse, status: number, bod
   res.end(req.method === 'HEAD' ? undefined : payload);
 }
 
-function handleHttp(req: IncomingMessage, res: ServerResponse): void {
+function handleHttp(req: IncomingMessage, res: ServerResponse, serveStatic: StaticHandler | null): void {
   let path: string;
   try {
     path = new URL(req.url ?? '/', 'http://localhost').pathname;
@@ -128,6 +129,7 @@ function handleHttp(req: IncomingMessage, res: ServerResponse): void {
     }
     return;
   }
+  if (serveStatic?.(req, res, path)) return;
   sendJson(req, res, 404, { error: 'NOT_FOUND' });
 }
 
@@ -136,7 +138,8 @@ export function createGameServer(options: GameServerOptions): GameServer {
   const logger = options.logger ?? silentLogger;
   const now = options.deps?.now ?? (() => Date.now());
 
-  const http = createServer(handleHttp);
+  const serveStatic = config.staticDir === null ? null : createStaticHandler(config.staticDir);
+  const http = createServer((req, res) => handleHttp(req, res, serveStatic));
   const io: IoServer = new Server(http, {
     serveClient: false,
     maxHttpBufferSize: config.limits.maxMessageBytes,
