@@ -7,8 +7,8 @@ export type { GameConnection } from './types';
 
 /**
  * Picks the transport:
- * - VITE_SERVER_URL set (and no ?demo=): the real server over Socket.IO;
- * - otherwise: the local demo match (mock), as before. `?demo=<cena>` always
+ * - a resolved server URL (see resolveServerUrl) and no ?demo=: the real server over Socket.IO;
+ * - otherwise (?demo=, or dev without a server): the local demo match (mock). `?demo=<cena>` always
  *   opens the demo, even in a build that has a server URL.
  */
 export function createConnection(config: ClientConfig): { connection: GameConnection; mock: MockConnection | null } {

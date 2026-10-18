@@ -11,7 +11,7 @@ import { createConnection } from './connection';
 import { ConnectionProvider } from './connection/context';
 import { ConnectionStore } from './connection/store';
 
-const config = readConfig(import.meta.env, window.location.search);
+const config = readConfig(import.meta.env, window.location.search, window.location.origin);
 const { connection, mock } = createConnection(config);
 const store = new ConnectionStore(connection);
 
