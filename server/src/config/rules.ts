@@ -200,6 +200,17 @@ export function loadRules(env: Env = process.env): RulesConfig {
       );
     }
   }
+  // The turn time is also the default of the table settings, which the protocol
+  // takes in whole seconds within [tableTurnSecondsMin, tableTurnSecondsMax]. A
+  // value outside that would make every room:setTable (echoing the default) fail.
+  const turnMs = timings['turnMs'] as number;
+  const turnMinMs = PROTOCOL_LIMITS.tableTurnSecondsMin * 1000;
+  const turnMaxMs = PROTOCOL_LIMITS.tableTurnSecondsMax * 1000;
+  if (turnMs < turnMinMs || turnMs > turnMaxMs || turnMs % 1000 !== 0) {
+    problems.push(
+      `${TIMING_ENV_VARS.turnMs}=${turnMs}: must be a whole number of seconds between ${turnMinMs} and ${turnMaxMs} ms`,
+    );
+  }
   if (problems.length > 0) {
     throw new Error(
       `Invalid rule timing in environment (allowed ${ENV_TIMING_LIMITS.minMs}-${ENV_TIMING_LIMITS.maxMs} ms): ${problems.join(', ')}`,

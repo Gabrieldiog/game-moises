@@ -123,6 +123,14 @@ describe('loadConfig', () => {
     expect(config.rules.cards).toEqual(DEFAULT_RULES.cards);
   });
 
+  it('rejects a MOISES_TURN_MS the table settings could not echo back (room:setTable would fail)', () => {
+    for (const bad of ['4999', '3000', '250', '15500', '61000']) {
+      expect(() => loadConfig({ MOISES_TURN_MS: bad }), bad).toThrow(/MOISES_TURN_MS/);
+    }
+    expect(loadConfig({ MOISES_TURN_MS: '5000' }).rules.timings.turnMs).toBe(5000);
+    expect(loadConfig({ MOISES_TURN_MS: '60000' }).rules.timings.turnMs).toBe(60000);
+  });
+
   it('reports server and rule problems together', () => {
     expect(() => loadConfig({ PORT: 'x', MOISES_TURN_MS: '1' })).toThrow(/PORT[\s\S]*MOISES_TURN_MS/);
   });
