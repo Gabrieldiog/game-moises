@@ -34,6 +34,7 @@ describe('DEFAULT_RULES', () => {
       initialPeekMs: 5000,
       reactionWindowMs: 3000,
       revealMs: 3000,
+      turnMs: 30000,
     });
     expect(DEFAULT_RULES.cards.redOverrides.K).toEqual({ value: -1, power: null });
     expect(DEFAULT_RULES.cards.joker).toEqual({ value: 0, power: null });
@@ -56,8 +57,15 @@ describe('loadRules', () => {
       MOISES_INITIAL_PEEK_MS: '4000',
       MOISES_REACTION_WINDOW_MS: '2500',
       MOISES_REVEAL_MS: ' 1500 ',
+      MOISES_TURN_MS: '20000',
     });
-    expect(rules.timings).toEqual({ arrangeMs: 7000, initialPeekMs: 4000, reactionWindowMs: 2500, revealMs: 1500 });
+    expect(rules.timings).toEqual({
+      arrangeMs: 7000,
+      initialPeekMs: 4000,
+      reactionWindowMs: 2500,
+      revealMs: 1500,
+      turnMs: 20000,
+    });
     expect(rules.cards).toEqual(DEFAULT_RULES.cards);
     expect(Object.isFrozen(rules.timings)).toBe(true);
   });
