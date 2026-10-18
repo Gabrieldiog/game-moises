@@ -19,22 +19,11 @@ describe('planFx', () => {
     ]);
   });
 
-  it('power swap exchanges the two positions, whoever owns them', () => {
-    const steps = planFx([{ type: 'powerSwapped', playerId: 'a', ownSlot: 0, target: { playerId: 'b', slot: 3 } }], 'me');
-    expect(steps).toEqual([
-      { kind: 'move', at: 'slot:a:0', from: 'slot:b:3' },
-      { kind: 'move', at: 'slot:b:3', from: 'slot:a:0' },
-    ]);
-  });
-
-  it('reactions stamp the table; a wrong one moves nothing', () => {
+  it('reactions move the matched card to the discard; a wrong one moves nothing', () => {
     const wrong: ServerGameEvent = { type: 'reactionFailed', reaction: 'matchOwn', playerId: 'a', slot: 1, revealed: card };
-    expect(planFx([wrong], 'me')).toEqual([{ kind: 'stamp', ok: false, reaction: 'matchOwn', playerId: 'a' }]);
+    expect(planFx([wrong], 'me')).toEqual([]);
     const right: ServerGameEvent = { type: 'reactionSucceeded', reaction: 'matchOwn', playerId: 'a', slot: 1, card };
-    expect(planFx([right], 'me')).toEqual([
-      { kind: 'move', at: 'discard', from: 'slot:a:1' },
-      { kind: 'stamp', ok: true, reaction: 'matchOwn', playerId: 'a' },
-    ]);
+    expect(planFx([right], 'me')).toEqual([{ kind: 'move', at: 'discard', from: 'slot:a:1' }]);
   });
 
   it('ignores events with nothing to animate', () => {

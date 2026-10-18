@@ -1,0 +1,753 @@
+/*
+ * Transparency layer: the step guide, the shouts' lock, the narrator (balloons,
+ * rings, the eye, the stamp) and the history sheet. Same language as the rest:
+ * paper and ink under the lamp, fluorescent poster colors only where something
+ * is happening right now.
+ */
+
+/* --- step guide (powers and a claimed reaction) ------------------------------ */
+
+.guide {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 5px;
+  border: 2.5px solid var(--tinta);
+  border-radius: var(--radius-poster);
+  background: var(--papel);
+  color: var(--tinta);
+  box-shadow: 3px 3px 0 var(--tinta);
+}
+
+.guide--claim {
+  background: var(--lambe-rosa);
+}
+
+.guide__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.guide__title {
+  font-family: var(--font-ui);
+  font-weight: 800;
+  font-stretch: 88%;
+  font-size: 15px;
+  line-height: 1.15;
+}
+
+.guide__tail {
+  flex: none;
+  display: flex;
+}
+
+.guide__restart {
+  min-height: 34px;
+  padding: 2px 4px;
+  color: var(--tinta);
+  font-size: 12.5px;
+}
+
+/* the steps read left to right; the current one takes the room it needs */
+.guide__steps {
+  display: flex;
+  gap: 4px;
+  list-style: none;
+}
+
+.guide__step {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 3px 6px 3px 3px;
+  border: 2px solid rgb(0 0 0 / 0.35);
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 650;
+  font-stretch: 86%;
+  line-height: 1.15;
+  opacity: 0.6;
+}
+
+.guide__step.is-now {
+  flex: 3 1 0;
+  border-color: var(--tinta);
+  background: var(--lambe-amarelo);
+  font-size: 14px;
+  font-weight: 800;
+  opacity: 1;
+  box-shadow: 2px 2px 0 var(--tinta);
+}
+
+.guide--claim .guide__step.is-now {
+  background: var(--papel);
+}
+
+.guide__step.is-done {
+  flex: none;
+  opacity: 0.5;
+  border-style: dashed;
+}
+
+/* a finished step keeps only its check mark */
+.guide__steps .guide__step.is-done .guide__text {
+  display: none;
+}
+
+.guide__text {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.guide__step:not(.is-now) .guide__text {
+  -webkit-line-clamp: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.guide__num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--tinta);
+  color: var(--papel);
+  font-family: var(--font-display);
+  font-size: 12px;
+}
+
+.guide__step.is-now .guide__num {
+  animation: step-pulse 900ms ease-in-out infinite alternate;
+}
+
+@keyframes step-pulse {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.18);
+  }
+}
+
+/* the guide takes room from the action bar: your cards get a little smaller */
+.table.is-guided {
+  --card-you: clamp(50px, min(17vw, 10.6svh), 124px);
+  --card-hand: clamp(52px, min(16vw, 10svh), 108px);
+}
+
+.table.is-guided[data-opponents='4'],
+.table.is-guided[data-opponents='5'] {
+  --card-you: clamp(44px, min(14vw, 8.6svh), 124px);
+  --card-pile: clamp(44px, min(12vw, 7.4svh), 92px);
+}
+
+@media (min-width: 900px) and (min-aspect-ratio: 5/4) {
+  .table.is-guided[data-opponents] {
+    --card-you: clamp(60px, 8.6svh, 124px);
+  }
+}
+
+@media (max-height: 760px) and (max-width: 899px) {
+  .table.is-guided {
+    --card-you: clamp(46px, min(15vw, 9.4svh), 124px);
+  }
+
+  .table.is-guided[data-opponents='4'],
+  .table.is-guided[data-opponents='5'] {
+    --card-you: clamp(44px, min(12.4vw, 7.6svh), 124px);
+    --card-pile: clamp(40px, min(11vw, 6.6svh), 92px);
+  }
+
+  .actionbar .btn {
+    min-height: 46px;
+    padding-block: 6px;
+  }
+
+  .table.is-guided .felt {
+    padding-block: 4px 6px;
+  }
+
+  .table.is-guided .me__foot {
+    margin-top: 4px;
+  }
+
+  .table.is-guided .actionbar {
+    gap: 6px;
+    padding-top: 4px;
+  }
+
+  .guide__step.is-now {
+    font-size: 13px;
+  }
+}
+
+/* --- cards you can tap now glow; the rest step back (table.css) ---------------- */
+
+.table.is-picking .card.is-selectable:not(.is-selected) {
+  box-shadow:
+    0 0 0 3px var(--lambe-amarelo),
+    0 0 16px 2px rgb(255 225 74 / 0.55),
+    var(--sombra-carta);
+  animation: pick-glow 1000ms ease-in-out infinite alternate;
+}
+
+.table.is-claiming .card.is-selectable:not(.is-selected) {
+  box-shadow:
+    0 0 0 3px var(--lambe-rosa),
+    0 0 16px 2px rgb(255 92 168 / 0.6),
+    var(--sombra-carta);
+}
+
+@keyframes pick-glow {
+  from {
+    filter: brightness(1);
+  }
+  to {
+    filter: brightness(1.18);
+  }
+}
+
+/* --- shouts: why they are off ------------------------------------------------ */
+
+.shouts-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.shouts__why {
+  align-self: center;
+  max-width: 100%;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgb(244 238 221 / 0.14);
+  color: var(--papel);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.shouts__why.is-claimed {
+  background: var(--lambe-rosa);
+  color: var(--tinta);
+  border: 2px solid var(--tinta);
+}
+
+.shout.is-locked {
+  background-image: repeating-linear-gradient(-45deg, rgb(0 0 0 / 0.16) 0 6px, transparent 6px 12px);
+}
+
+/* when you claimed the window the action bar is only the guide */
+.actionbar--claim .guide {
+  padding-block: 8px 10px;
+}
+
+/* --- table tools (history, sound) in the empty column left of your grid ------- */
+
+.me__side {
+  display: flex;
+  justify-content: flex-start;
+  align-self: end;
+  min-width: 0;
+}
+
+.tools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.felt__spectator-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.felt__spectator-row .tools {
+  flex-direction: row;
+}
+
+.iconbtn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--touch);
+  height: var(--touch);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+}
+
+.iconbtn--felt {
+  background: rgb(14 10 8 / 0.72);
+  color: var(--papel);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.45);
+}
+
+.iconbtn--felt.is-on {
+  background: var(--papel);
+  color: var(--tinta);
+}
+
+.iconbtn--felt.is-off {
+  color: rgb(244 238 221 / 0.55);
+}
+
+.iconbtn__badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 2px solid var(--tinta);
+  border-radius: 999px;
+  background: var(--lambe-amarelo);
+  color: var(--tinta);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 16px;
+  text-align: center;
+}
+
+.soundctl {
+  position: relative;
+}
+
+.soundctl__pop {
+  position: absolute;
+  z-index: 45;
+  bottom: calc(100% + 8px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 210px;
+  padding: 10px;
+  border: 2.5px solid var(--tinta);
+  border-radius: var(--radius-poster);
+  background: var(--papel);
+  color: var(--tinta);
+  box-shadow: var(--poster-shadow);
+}
+
+.soundctl__mute {
+  min-height: var(--touch);
+}
+
+.soundctl__mute.btn--ghost {
+  color: var(--tinta);
+  border-color: var(--tinta);
+}
+
+.soundctl__vol {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.soundctl__vol input {
+  width: 100%;
+  min-height: var(--touch);
+  accent-color: var(--tinta);
+}
+
+/* --- narrator: one thing at a time, where it happened ------------------------------ */
+
+.narrator {
+  position: absolute;
+  inset: 0;
+  z-index: 35;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.narrator__ring {
+  position: absolute;
+  margin: -5px;
+  padding: 5px;
+  box-sizing: content-box;
+  border: 3px solid var(--lambe-amarelo);
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 2px var(--tinta),
+    0 0 18px rgb(255 225 74 / 0.6);
+  animation: ring-in 260ms cubic-bezier(0.2, 1.2, 0.4, 1) both;
+}
+
+.narrator__ring--swap {
+  border-color: var(--lambe-rosa);
+  box-shadow:
+    0 0 0 2px var(--tinta),
+    0 0 18px rgb(255 92 168 / 0.6);
+}
+
+.narrator__ring--miss {
+  border-color: var(--papel);
+  box-shadow: 0 0 0 2px var(--tinta);
+}
+
+.narrator__ring--note {
+  border-color: var(--lambe-laranja);
+}
+
+@keyframes ring-in {
+  from {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* the eye sits on the card being looked at */
+.narrator__eye {
+  position: absolute;
+  display: grid;
+  place-items: center;
+}
+
+.narrator__eye-svg {
+  width: max(40px, 90%);
+  filter: drop-shadow(2px 2px 0 var(--tinta));
+  animation:
+    eye-in 240ms cubic-bezier(0.2, 1.2, 0.4, 1) both,
+    eye-blink 1100ms ease-in-out 300ms;
+  transform-origin: center;
+}
+
+.narrator__eye-white {
+  fill: var(--papel);
+  stroke: var(--tinta);
+  stroke-width: 2.5;
+}
+
+.narrator__eye-iris {
+  fill: var(--lambe-rosa);
+  stroke: var(--tinta);
+  stroke-width: 2;
+  animation: eye-look 1100ms ease-in-out;
+}
+
+.narrator__eye-pupil {
+  fill: var(--tinta);
+  animation: eye-look 1100ms ease-in-out;
+}
+
+@keyframes eye-in {
+  from {
+    opacity: 0;
+    scale: 0.4;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@keyframes eye-blink {
+  0%,
+  44%,
+  56%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.1);
+  }
+}
+
+@keyframes eye-look {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  30% {
+    transform: translateX(-4px);
+  }
+  70% {
+    transform: translateX(4px);
+  }
+}
+
+/* the balloon points at the player who did it */
+.balloon {
+  position: absolute;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: max-content;
+  max-width: min(300px, calc(100% - 16px));
+  padding: 6px 10px;
+  border: 2.5px solid var(--tinta);
+  border-radius: 12px;
+  background: var(--papel);
+  color: var(--tinta);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  box-shadow: 3px 3px 0 var(--tinta);
+  transform: translateX(-50%);
+  animation: balloon-in 200ms cubic-bezier(0.2, 1.2, 0.4, 1) both;
+}
+
+.balloon::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -9px;
+  width: 12px;
+  height: 12px;
+  border-left: 2.5px solid var(--tinta);
+  border-top: 2.5px solid var(--tinta);
+  background: inherit;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.balloon--up {
+  transform: translate(-50%, -100%);
+}
+
+.balloon--up::before {
+  top: auto;
+  bottom: -9px;
+  rotate: 180deg;
+}
+
+.balloon--center {
+  top: 40%;
+}
+
+.balloon--center::before {
+  display: none;
+}
+
+.balloon--swap {
+  background: var(--lambe-rosa);
+}
+
+.balloon--peek {
+  background: var(--lambe-amarelo);
+}
+
+.balloon--ok {
+  background: var(--lambe-amarelo);
+}
+
+.balloon__icon {
+  flex: none;
+  margin-top: 1px;
+}
+
+@keyframes balloon-in {
+  from {
+    opacity: 0;
+    scale: 0.8;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+.narrator .stamp {
+  top: 46%;
+}
+
+.stamp--claim {
+  background: var(--lambe-rosa);
+  rotate: -4deg;
+}
+
+/* --- history: a ruled notebook sheet ------------------------------------------ */
+
+.feed__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+  background: rgb(0 0 0 / 0.35);
+}
+
+.feed {
+  position: fixed;
+  z-index: 50;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 58svh;
+  padding-bottom: env(safe-area-inset-bottom);
+  border-top: 3px solid var(--tinta);
+  border-radius: 14px 14px 0 0;
+  background: var(--papel);
+  color: var(--tinta);
+  box-shadow: 0 -10px 30px rgb(0 0 0 / 0.55);
+  animation: sheet-in 220ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+.feed__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px 4px var(--gutter);
+  border-bottom: 2px solid var(--tinta);
+}
+
+.feed__title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 18px;
+}
+
+.feed__empty {
+  padding: 16px var(--gutter);
+  font-weight: 650;
+}
+
+.feed__list {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  padding: 4px var(--gutter) 10px;
+  /* ruled paper */
+  background-image: repeating-linear-gradient(to bottom, transparent 0 39px, rgb(0 0 0 / 0.12) 39px 40px);
+  background-attachment: local;
+}
+
+.feed__line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 40px;
+  padding: 9px 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.feed__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 22px;
+}
+
+/* a highlighter stroke: what touched you, and the reactions */
+.feed__line--mine .feed__text {
+  background: linear-gradient(to bottom, transparent 45%, rgb(255 225 74 / 0.85) 45% 92%, transparent 92%);
+}
+
+.feed__line--hot .feed__text {
+  background: linear-gradient(to bottom, transparent 45%, rgb(255 92 168 / 0.6) 45% 92%, transparent 92%);
+}
+
+.feed__line:first-child {
+  font-weight: 800;
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@media (min-width: 900px) and (min-aspect-ratio: 5/4) {
+  .feed__scrim {
+    display: none;
+  }
+
+  .feed {
+    top: 76px;
+    right: 14px;
+    bottom: 14px;
+    left: auto;
+    width: 320px;
+    max-height: none;
+    border: 3px solid var(--tinta);
+    border-radius: var(--radius-poster);
+    box-shadow: var(--poster-shadow);
+    animation-name: panel-in;
+  }
+
+  @keyframes panel-in {
+    from {
+      transform: translateX(110%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide__step.is-now .guide__num,
+  .table.is-picking .card.is-selectable:not(.is-selected),
+  .narrator__ring,
+  .narrator__eye-svg,
+  .narrator__eye-iris,
+  .narrator__eye-pupil,
+  .balloon,
+  .feed {
+    animation: none;
+  }
+}
+
+/* when the shouts are off, the line above them says why; their small print goes */
+.shouts--quiet .shout__hint {
+  display: none;
+}
+
+.shouts--quiet .shout {
+  min-height: 52px;
+}
+
+.status__hint {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* the "Estou foda" banner stays on one line, so it never pushes the table off screen */
+.endcall {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.endcall__title {
+  flex: none;
+}
+
+.endcall__hint {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

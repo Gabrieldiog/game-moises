@@ -184,7 +184,9 @@ export class MockConnection implements GameConnection {
     if (!parsed.ok) return this.refuse({ code: 'BAD_REQUEST', request: 'game:action', message: parsed.issues.join('; ') });
     this.sent.push(parsed.action);
     if (this.options.autoAdvance === false || !this.scenario) return Promise.resolve(OK);
-    const next = DEMO_SCRIPT[this.scenario]?.onAction?.[parsed.action.type];
+    const a = parsed.action;
+    const key = a.type === 'claimReaction' ? `claimReaction:${a.kind}` : a.type;
+    const next = DEMO_SCRIPT[this.scenario]?.onAction?.[key];
     if (next) this.loadScenario(next, this.players, this.names);
     return Promise.resolve(OK);
   }

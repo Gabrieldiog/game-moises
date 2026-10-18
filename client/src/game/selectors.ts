@@ -1,4 +1,4 @@
-import type { GameView, PlayerId, PlayerView, PowerKind, SlotRef, SlotView } from '@moises/shared';
+import type { GameView, PlayerId, PlayerView, PowerKind, ReactionKind, SlotRef, SlotView } from '@moises/shared';
 
 // Read-only helpers over the GameView sent by the server. Nothing here decides
 // a game outcome: they only answer "what should the screen show / offer now".
@@ -50,7 +50,8 @@ export function hasTimedCards(view: GameView, serverNow: number): boolean {
   );
 }
 
-export type CountdownKind = 'arrange' | 'initialPeek' | 'reaction' | 'turn';
+/** claim: you shouted and are choosing the cards; claimOther: someone else is. */
+export type CountdownKind = 'arrange' | 'initialPeek' | 'reaction' | 'claim' | 'claimOther' | 'turn';
 
 export interface ActiveCountdown {
   readonly kind: CountdownKind;
@@ -67,8 +68,14 @@ export function activeCountdown(view: GameView, turnDeadline: number | null = nu
   if ((view.phase === 'arrange' || view.phase === 'initialPeek') && view.phaseDeadline !== null) {
     return { kind: view.phase, deadline: view.phaseDeadline };
   }
-  if (view.phase === 'playing' && view.reactionWindow) {
-    return { kind: 'reaction', deadline: view.reactionWindow.deadline };
+  const window = view.reactionWindow;
+  if (view.phase === 'playing' && window) {
+    // While the current player has a decision of their own (e.g. a power), their clock wins.
+    const ownStep = view.turn !== null && view.turn.playerId === view.you && view.turn.step !== 'reaction';
+    if (window.claimedBy !== null) {
+      return { kind: window.claimedBy === view.you ? 'claim' : 'claimOther', deadline: window.deadline };
+    }
+    if (!(ownStep && turnDeadline !== null)) return { kind: 'reaction', deadline: window.deadline };
   }
   if (view.phase === 'playing' && view.turn !== null && turnDeadline !== null) {
     return { kind: 'turn', deadline: turnDeadline };
@@ -86,7 +93,10 @@ export type UiContext =
   /** targetCount: TurnView.powerTargetCount, how many cards the server expects (null if unknown). */
   | { readonly kind: 'myPower'; readonly power: PowerKind; readonly targetCount: number | null }
   | { readonly kind: 'myPowerSwap'; readonly peeked: readonly SlotRef[] }
+  /** A reaction window is open and you have nothing else to do; canReact: you can still shout. */
   | { readonly kind: 'reaction'; readonly canReact: boolean }
+  /** You shouted first: the window is yours, pick the cards for `reaction`. */
+  | { readonly kind: 'claim'; readonly reaction: ReactionKind }
   | { readonly kind: 'waiting'; readonly playerId: PlayerId | null }
   | { readonly kind: 'ended' };
 
@@ -97,14 +107,15 @@ export function uiContext(view: GameView, serverNow: number): UiContext {
   if (view.phase === 'initialPeek') return { kind: 'initialPeek' };
 
   const window = view.reactionWindow;
+  const turn = view.turn;
   if (window) {
-    const open = window.deadline > serverNow;
-    // The server says how many attempts the viewer has left (2 per window by default).
-    const canReact = open && (window.yourAttemptsLeft ?? 0) > 0;
-    return { kind: 'reaction', canReact };
+    const offer = reactionOffer(view, serverNow);
+    if (offer?.mine && window.claimKind !== null) return { kind: 'claim', reaction: window.claimKind };
+    // A decision of your own turn (a power, for instance) stays on screen; the shouts are offered next to it.
+    const ownStep = turn !== null && turn.playerId === view.you && turn.step !== 'reaction';
+    if (!ownStep) return { kind: 'reaction', canReact: offer?.canShout ?? false };
   }
 
-  const turn = view.turn;
   if (!turn) return { kind: 'waiting', playerId: null };
   if (turn.playerId !== view.you) return { kind: 'waiting', playerId: turn.playerId };
   switch (turn.step) {
@@ -124,6 +135,37 @@ export function uiContext(view: GameView, serverNow: number): UiContext {
   }
 }
 
+/** The reaction window as the viewer can use it right now (null when no window is open). */
+export interface ReactionOffer {
+  /** The window is still open on the server clock. */
+  readonly open: boolean;
+  /** The shout buttons work: open, nobody claimed it and you have attempts left. The server still decides. */
+  readonly canShout: boolean;
+  readonly claimedBy: PlayerId | null;
+  readonly claimKind: ReactionKind | null;
+  /** You are the one who claimed it. */
+  readonly mine: boolean;
+  readonly attemptsLeft: number | null;
+  readonly attemptsTotal: number;
+}
+
+export function reactionOffer(view: GameView, serverNow: number): ReactionOffer | null {
+  const window = view.reactionWindow;
+  if (view.phase !== 'playing' || !window || view.you === null) return null;
+  const open = window.deadline > serverNow;
+  const claimedBy = window.claimedBy ?? null;
+  const left = window.yourAttemptsLeft;
+  return {
+    open,
+    canShout: open && claimedBy === null && (left ?? 0) > 0,
+    claimedBy,
+    claimKind: window.claimKind ?? null,
+    mine: open && claimedBy !== null && claimedBy === view.you,
+    attemptsLeft: left,
+    attemptsTotal: window.attemptsPerPlayer,
+  };
+}
+
 /** "Estou foda" is offered during your own turn while nobody has called the end. The server validates it. */
 export function canOfferCallEnd(view: GameView): boolean {
   return view.phase === 'playing' && view.you !== null && view.turn?.playerId === view.you && view.endCall === null;
@@ -140,7 +182,7 @@ export function contextKey(view: GameView, ctx: UiContext): string {
     view.phase,
     ctx.kind,
     turn ? `${turn.playerId}:${turn.number}:${turn.step}` : '-',
-    window ? `${window.openedBy}:${window.deadline}` : '-',
+    window ? `${window.openedBy}:${JSON.stringify(window.card)}:${window.claimedBy ?? ''}:${window.claimKind ?? ''}` : '-',
   ].join('|');
 }
 

@@ -12,9 +12,9 @@ export type FxStep =
   /** The thing at `at` is already in place; show it arriving from where `from` was. */
   | { readonly kind: 'move'; readonly at: string; readonly from: string }
   /** A face-down card that has no element of its own flies between two anchors. */
-  | { readonly kind: 'ghost'; readonly from: string; readonly to: string }
-  /** "Filha da putinha!" and friends stamped on the table. */
-  | { readonly kind: 'stamp'; readonly ok: boolean; readonly reaction: 'matchOwn' | 'matchOpponent'; readonly playerId: PlayerId };
+  | { readonly kind: 'ghost'; readonly from: string; readonly to: string };
+// Swaps between positions (cardsSwapped), peeks and reaction stamps are told
+// one at a time by the narrator (game/narrate.ts, components/Narrator.tsx).
 
 export const slotAnchor = (playerId: PlayerId, slot: number): string => `slot:${playerId}:${slot}`;
 const handAnchor = (playerId: PlayerId): string => `hand:${playerId}`;
@@ -40,9 +40,6 @@ export function planFx(events: readonly ServerGameEvent[], me: PlayerId | null):
       case 'cardsArranged':
         swap(slotAnchor(event.playerId, event.toSlot), slotAnchor(event.playerId, event.fromSlot));
         break;
-      case 'powerSwapped':
-        swap(slotAnchor(event.playerId, event.ownSlot), slotAnchor(event.target.playerId, event.target.slot));
-        break;
       case 'reactionSucceeded':
         if (event.reaction === 'matchOwn') {
           steps.push({ kind: 'move', at: 'discard', from: slotAnchor(event.playerId, event.slot) });
@@ -50,10 +47,6 @@ export function planFx(events: readonly ServerGameEvent[], me: PlayerId | null):
           steps.push({ kind: 'move', at: 'discard', from: slotAnchor(event.target.playerId, event.target.slot) });
           steps.push({ kind: 'move', at: slotAnchor(event.target.playerId, event.target.slot), from: slotAnchor(event.playerId, event.giveSlot) });
         }
-        steps.push({ kind: 'stamp', ok: true, reaction: event.reaction, playerId: event.playerId });
-        break;
-      case 'reactionFailed':
-        steps.push({ kind: 'stamp', ok: false, reaction: event.reaction, playerId: event.playerId });
         break;
       default:
         break;

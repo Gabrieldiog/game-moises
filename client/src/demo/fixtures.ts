@@ -6,6 +6,7 @@ import type {
   PlayerView,
   PowerKind,
   Rank,
+  ReactionKind,
   SlotRef,
   SlotView,
   Suit,
@@ -23,7 +24,7 @@ export const DEMO_SERVER = {
   players: { min: 2, max: 6 },
   deckSize: 54,
   gridSize: 4,
-  timings: { arrangeMs: 5_000, initialPeekMs: 5_000, reactionWindowMs: 3_000, revealMs: 3_000, turnMs: 15_000 },
+  timings: { arrangeMs: 5_000, initialPeekMs: 5_000, reactionWindowMs: 3_000, claimMs: 8_000, revealMs: 3_000, turnMs: 15_000 },
   /** Cards the black K shows (the server sends it as TurnView.powerTargetCount). */
   powers: { peekManyCount: 2 },
   /** Reaction attempts per player per window (ReactionWindowView.attemptsPerPlayer). */
@@ -54,6 +55,9 @@ export const SCENARIOS = [
   { id: 'poder-k', label: 'Poder do Rei preto: escolher alvos' },
   { id: 'poder-k-troca', label: 'Poder do Rei preto: trocar?' },
   { id: 'reacao', label: 'Janela de reação aberta' },
+  { id: 'reacao-gritei', label: 'Reação: gritei “Filho da puta!”' },
+  { id: 'reacao-gritei-igual', label: 'Reação: gritei “Filha da putinha!”' },
+  { id: 'reacao-outro-gritou', label: 'Reação: outro jogador gritou' },
   { id: 'vez-de-outro', label: 'Vez de outro jogador' },
   { id: 'estou-foda', label: '“Estou foda” chamado' },
   { id: 'fim', label: 'Fim de jogo' },
@@ -194,6 +198,25 @@ function peekSwapScene(ctx: Ctx, power: PowerKind, discarded: Card, peeked: read
   };
 }
 
+/** The reaction window after someone shouted first (the server extends the deadline). */
+function claimScene(ctx: Ctx, claimer: PlayerId, kind: ReactionKind): GameView {
+  const discarder = ctx.opp(1);
+  return {
+    ...midGame(ctx, 7, card('5', 'hearts')),
+    turn: turn(discarder, 7, { step: 'reaction' }),
+    reactionWindow: {
+      card: card('5', 'hearts'),
+      openedBy: discarder,
+      deadline: ctx.now + ctx.ms('claimMs'),
+      claimedBy: claimer,
+      claimKind: kind,
+      attemptedBy: [],
+      attemptsPerPlayer: DEMO_SERVER.reactionAttempts,
+      yourAttemptsLeft: DEMO_SERVER.reactionAttempts,
+    },
+  };
+}
+
 // Final grids and totals, seat by seat (literal data of the mock server).
 const END_GRIDS: readonly (readonly SlotView[])[] = [
   [V(card('A', 'spades'), null), V(card('2', 'hearts'), null), V(card('K', 'diamonds'), null), V(card('5', 'clubs'), null)],
@@ -253,12 +276,18 @@ const SCENES: Record<ScenarioId, (ctx: Ctx) => GameView> = {
         card: card('5', 'hearts'),
         openedBy: discarder,
         deadline: ctx.now + ctx.ms('reactionWindowMs'),
+        claimedBy: null,
+        claimKind: null,
         attemptedBy: wrong ? [wrong] : [],
         attemptsPerPlayer: DEMO_SERVER.reactionAttempts,
         yourAttemptsLeft: DEMO_SERVER.reactionAttempts,
       },
     };
   },
+
+  'reacao-gritei': (ctx) => claimScene(ctx, ctx.ids[0] ?? 's0', 'matchOpponent'),
+  'reacao-gritei-igual': (ctx) => claimScene(ctx, ctx.ids[0] ?? 's0', 'matchOwn'),
+  'reacao-outro-gritou': (ctx) => claimScene(ctx, ctx.n >= 3 ? ctx.opp(2) : ctx.opp(1), 'matchOpponent'),
 
   'vez-de-outro': (ctx) => ({
     ...midGame(ctx, 8, card('2', 'spades')),
@@ -331,5 +360,12 @@ export const DEMO_SCRIPT: Partial<
   'poder-j-troca': { onAction: { powerSwap: 'vez-de-outro', skipPower: 'vez-de-outro' } },
   'poder-k': { onAction: { usePower: 'poder-k-troca', skipPower: 'vez-de-outro' } },
   'poder-k-troca': { onAction: { powerSwap: 'vez-de-outro', skipPower: 'vez-de-outro' } },
-  reacao: { onAction: { matchOwn: 'vez-de-outro', matchOpponent: 'vez-de-outro' }, onDeadline: 'vez-de-outro' },
+  // claimReaction is keyed by its kind (see MockConnection.send).
+  reacao: {
+    onAction: { 'claimReaction:matchOpponent': 'reacao-gritei', 'claimReaction:matchOwn': 'reacao-gritei-igual' },
+    onDeadline: 'vez-de-outro',
+  },
+  'reacao-gritei': { onAction: { matchOpponent: 'vez-de-outro' }, onDeadline: 'vez-de-outro' },
+  'reacao-gritei-igual': { onAction: { matchOwn: 'vez-de-outro' }, onDeadline: 'vez-de-outro' },
+  'reacao-outro-gritou': { onDeadline: 'vez-de-outro' },
 };

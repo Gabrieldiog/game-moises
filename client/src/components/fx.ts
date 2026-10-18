@@ -90,3 +90,88 @@ export function ghostCard(backUrl: string, from: DOMRect, to: DOMRect): void {
   animation.onfinish = () => img.remove();
   animation.oncancel = () => img.remove();
 }
+
+/**
+ * Two positions swapped cards: both cards fly, face down, along crossing arcs
+ * to the other place, leaving a short trail. The real cards (already in their
+ * new places) are hidden during the flight. With reduced motion, the two
+ * cards only fade out and back in.
+ */
+export function flySwap(backUrl: string, a: HTMLElement, b: HTMLElement, ms: number): void {
+  if (typeof document === 'undefined') return;
+  const ra = a.getBoundingClientRect();
+  const rb = b.getBoundingClientRect();
+  if (ra.width === 0 || rb.width === 0) return;
+  if (!motionAllowed()) {
+    for (const el of [a, b]) {
+      if (typeof el.animate === 'function') {
+        el.animate([{ opacity: 1 }, { opacity: 0.15 }, { opacity: 1 }], { duration: ms, easing: 'ease-in-out' });
+      }
+    }
+    return;
+  }
+  const hidden = [a, b];
+  for (const el of hidden) el.style.visibility = 'hidden';
+  let pending = 0;
+  const finish = () => {
+    pending -= 1;
+    if (pending <= 0) for (const el of hidden) el.style.visibility = '';
+  };
+  // Trail: the card itself plus fainter copies just behind it.
+  const trail = [1, 0.42, 0.24, 0.12];
+  for (const [from, to, side] of [
+    [ra, rb, 1],
+    [rb, ra, -1],
+  ] as const) {
+    const dx = to.left - from.left;
+    const dy = to.top - from.top;
+    const scale = to.width / from.width;
+    // Lift each card sideways so the two paths cross as arcs instead of overlapping.
+    const len = Math.max(1, Math.hypot(dx, dy));
+    const lift = Math.min(90, len * 0.28) * side;
+    const mx = dx / 2 + (-dy / len) * lift;
+    const my = dy / 2 + (dx / len) * lift;
+    trail.forEach((opacity, i) => {
+      const img = document.createElement('img');
+      img.src = backUrl;
+      img.alt = '';
+      img.setAttribute('aria-hidden', 'true');
+      img.className = 'flying-card';
+      Object.assign(img.style, {
+        position: 'fixed',
+        left: `${from.left}px`,
+        top: `${from.top}px`,
+        width: `${from.width}px`,
+        height: `${from.height}px`,
+        borderRadius: '5px',
+        pointerEvents: 'none',
+        zIndex: String(60 - i),
+        transformOrigin: 'top left',
+        opacity: String(opacity),
+        boxShadow: i === 0 ? '0 0 0 3px var(--lambe-rosa), 0 14px 26px rgb(0 0 0 / 0.6)' : 'none',
+      });
+      document.body.appendChild(img);
+      if (typeof img.animate !== 'function') {
+        img.remove();
+        return;
+      }
+      pending += 1;
+      const mid = (1 + scale) / 2 + 0.18;
+      const animation = img.animate(
+        [
+          { transform: 'translate(0, 0) scale(1) rotate(0deg)' },
+          { transform: `translate(${mx}px, ${my}px) scale(${mid}) rotate(${side * 10}deg)`, offset: 0.5 },
+          { transform: `translate(${dx}px, ${dy}px) scale(${scale}) rotate(0deg)` },
+        ],
+        { duration: ms, delay: i * 40, easing: 'cubic-bezier(0.3, 0.1, 0.25, 1)', fill: 'backwards' },
+      );
+      const done = () => {
+        img.remove();
+        finish();
+      };
+      animation.onfinish = done;
+      animation.oncancel = done;
+    });
+  }
+  if (pending === 0) for (const el of hidden) el.style.visibility = '';
+}

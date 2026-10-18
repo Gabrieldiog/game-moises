@@ -1,4 +1,4 @@
-import type { GameView } from '@moises/shared';
+import type { GameView, PowerKind } from '@moises/shared';
 import { POWER_TEXT, T, cardShort } from '../i18n/pt-BR';
 import type { Picks } from './intent';
 import { playerName, type UiContext } from './selectors';
@@ -12,6 +12,12 @@ export interface StatusLines {
 
 function nameOrYou(view: GameView, id: string): string {
   return id === view.you ? T.you : playerName(view, id);
+}
+
+/** "Poder do Q♥: trocar no escuro" (the card is the public discard that gave the power). */
+function powerTitle(view: GameView, power: PowerKind): string {
+  const name = POWER_TEXT[power].name.toLowerCase();
+  return view.discardTop ? T.guide.powerOf(cardShort(view.discardTop), name) : T.guide.power(name);
 }
 
 /** Headline and hint of the status bar for the current moment. */
@@ -37,18 +43,25 @@ export function statusLines(view: GameView, ctx: UiContext, picks: Picks): Statu
       return { title: T.yourTurn, hint: T.decideHint, tone: 'mine' };
     case 'myPower':
       return {
-        title: T.powerTitle(POWER_TEXT[ctx.power].name),
-        hint: ctx.power === 'peekManyAndSwap' && ctx.targetCount !== null ? T.peekManyHint(ctx.targetCount) : POWER_TEXT[ctx.power].hint,
+        title: powerTitle(view, ctx.power),
+        // The step guide in the action bar says what to tap.
+        hint: null,
         tone: 'mine',
       };
     case 'myPowerSwap':
       return {
-        title: T.powerSwapTitle,
-        hint: ctx.peeked.length === 1 ? T.powerSwapHintOne : T.powerSwapHint,
+        title: view.turn?.pendingPower ? powerTitle(view, view.turn.pendingPower) : T.powerSwapTitle,
+        hint: null,
         tone: 'mine',
       };
+    case 'claim':
+      return { title: ctx.reaction === 'matchOwn' ? T.claimTitleOwn : T.claimTitleOpp, hint: null, tone: 'hot' };
     case 'reaction': {
       const window = view.reactionWindow;
+      if (window && window.claimedBy !== null && window.claimedBy !== view.you) {
+        const shout = window.claimKind === 'matchOwn' ? T.shoutOwn : T.shoutOpponent;
+        return { title: T.claimedTitle(playerName(view, window.claimedBy), shout), hint: null, tone: 'hot' };
+      }
       const discarded = window ? T.reactionHint(nameOrYou(view, window.openedBy), cardShort(window.card)) : null;
       // While a shout is waiting for cards, the action bar says what to tap.
       const left = window?.yourAttemptsLeft ?? null;
@@ -59,7 +72,8 @@ export function statusLines(view: GameView, ctx: UiContext, picks: Picks): Statu
         : window && left === 0
           ? T.reactionDone
           : T.reactionClosed;
-      return { title: T.reactionTitle, hint: [discarded, extra].filter(Boolean).join(' '), tone: 'hot' };
+      const tip = ctx.canReact && (left === null || window === null || left >= window.attemptsPerPlayer) ? T.reactionTip : null;
+      return { title: T.reactionTitle, hint: [discarded, extra ?? tip].filter(Boolean).join(' '), tone: 'hot' };
     }
     case 'waiting': {
       const turn = view.turn;
