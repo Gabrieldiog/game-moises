@@ -53,7 +53,7 @@ Abrem a cada carta que vai para o descarte e duram uma janela curta (**[SUPOSIÇ
 - **"Filha da putinha":** a carta descartada tem o mesmo número que uma carta sua (qualquer naipe). Você descarta a sua e fica com uma carta a menos.
 - **"Filho da puta":** você sabe que a carta numa posição exata de um inimigo tem o mesmo número da descartada. Você pega a carta dele, descarta, e entrega uma das suas no lugar. Você fica com uma carta a menos; ele continua com a mesma quantidade.
 - **Erro:** se a carta indicada não tiver o mesmo número, nada sai do lugar e quem errou **revela para todos** uma carta dele: na "filha da putinha", a carta que tentou descartar; no "filho da puta", a carta que ia entregar. A carta fica visível por alguns segundos e volta a ficar virada para baixo.
-- **[SUPOSIÇÃO]** Vale reagir ao descarte de qualquer jogador, inclusive o seu.
+- Vale reagir ao descarte de qualquer jogador, inclusive o seu. A "filha da putinha" sempre tira uma carta **sua**; o "filho da puta" sempre tira a de um **inimigo**.
 - **[SUPOSIÇÃO]** O jogador da vez usa o poder depois que a janela de reação fecha.
 
 ## Fim de jogo
